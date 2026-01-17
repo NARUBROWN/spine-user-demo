@@ -1,10 +1,11 @@
 package controller
 
 import (
-	"log"
+	"spine-user-demo/repository"
 	"spine-user-demo/service"
 
-	"github.com/NARUBROWN/spine/core"
+	"github.com/NARUBROWN/spine/pkg/httperr"
+	"github.com/NARUBROWN/spine/pkg/query"
 )
 
 type UserController struct {
@@ -16,29 +17,31 @@ func NewUserController(userService *service.UserService) *UserController {
 }
 
 // 읽기
-func (c *UserController) GetUser(ctx core.Context, id int, name string, q UserQuery) any {
-	log.Printf("PathVariable과 QueryParam를 같이 쓸 수 있어요, PathVariable (id): %d, QueryParam: %d", id, q.ID)
-	if user, ok := c.userService.Get(q.ID); ok {
-		return user
+func (c *UserController) GetUser(q query.Values) (repository.User, error) {
+	userId := int(q.Int("id", 0))
+	if user, ok := c.userService.Get(userId); ok {
+		return user, nil
 	}
-	return map[string]string{"error": "유저를 찾을 수 없습니다."}
+	return repository.User{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 }
 
 // 생성
-func (c *UserController) CreateUser(ctx core.Context, req CreateUserRequest) any {
+func (c *UserController) CreateUser(req CreateUserRequest) any {
 	return c.userService.Create(req.ID, req.Name)
 }
 
 // 수정
-func (c *UserController) UpdateUser(ctx core.Context, q UserQuery, req UpdateUserRequest) any {
-	if user, ok := c.userService.Update(q.ID, req.Name); ok {
-		return user
+func (c *UserController) UpdateUser(q query.Values, req UpdateUserRequest) (repository.User, error) {
+	userId := int(q.Int("id", 0))
+	if user, ok := c.userService.Update(userId, req.Name); ok {
+		return user, nil
 	}
-	return map[string]string{"error": "유저를 찾을 수 없습니다."}
+	return repository.User{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 }
 
 // 삭제
-func (c *UserController) DeleteUser(ctx core.Context, q UserQuery) any {
-	c.userService.Delete(q.ID)
+func (c *UserController) DeleteUser(q query.Values) any {
+	userId := int(q.Int("id", 0))
+	c.userService.Delete(userId)
 	return map[string]string{"status": "삭제됨"}
 }
