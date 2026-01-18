@@ -8,10 +8,7 @@ import (
 
 type LoggingInterceptor struct{}
 
-func (i *LoggingInterceptor) PreHandle(
-	ctx core.ExecutionContext,
-	meta core.HandlerMeta,
-) error {
+func (i *LoggingInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
 	log.Printf(
 		"[Logging Interceptor][REQ] %s %s -> %s.%s",
 		ctx.Method(),
@@ -22,10 +19,7 @@ func (i *LoggingInterceptor) PreHandle(
 	return nil
 }
 
-func (i *LoggingInterceptor) PostHandle(
-	ctx core.ExecutionContext,
-	meta core.HandlerMeta,
-) {
+func (i *LoggingInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {
 	log.Printf(
 		"[Logging Interceptor][RES] %s %s OK",
 		ctx.Method(),

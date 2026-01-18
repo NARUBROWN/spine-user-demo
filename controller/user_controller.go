@@ -1,7 +1,9 @@
 package controller
 
 import (
-	"spine-user-demo/repository"
+	"context"
+
+	"spine-user-demo/dto"
 	"spine-user-demo/service"
 
 	"github.com/NARUBROWN/spine/pkg/httperr"
@@ -17,31 +19,49 @@ func NewUserController(userService *service.UserService) *UserController {
 }
 
 // 읽기
-func (c *UserController) GetUser(q query.Values) (repository.User, error) {
+func (c *UserController) GetUser(
+	ctx context.Context,
+	q query.Values,
+) (dto.CreateUserResponse, error) {
 	userId := int(q.Int("id", 0))
-	if user, ok := c.userService.Get(userId); ok {
-		return user, nil
+
+	user, err := c.userService.Get(ctx, userId)
+	if err != nil {
+		return dto.CreateUserResponse{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 	}
-	return repository.User{}, httperr.NotFound("유저를 찾을 수 없습니다.")
+
+	return user, nil
 }
 
 // 생성
-func (c *UserController) CreateUser(req CreateUserRequest) any {
-	return c.userService.Create(req.ID, req.Name)
+func (c *UserController) CreateUser(
+	ctx context.Context,
+	req dto.CreateUserRequest,
+) (dto.CreateUserResponse, error) {
+	return c.userService.Create(ctx, req.Name, req.Email)
 }
 
 // 수정
-func (c *UserController) UpdateUser(q query.Values, req UpdateUserRequest) (repository.User, error) {
+func (c *UserController) UpdateUser(
+	ctx context.Context,
+	q query.Values,
+	req dto.UpdateUserRequest,
+) (dto.CreateUserResponse, error) {
 	userId := int(q.Int("id", 0))
-	if user, ok := c.userService.Update(userId, req.Name); ok {
-		return user, nil
+
+	user, err := c.userService.Update(ctx, userId, req.Name)
+	if err != nil {
+		return dto.CreateUserResponse{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 	}
-	return repository.User{}, httperr.NotFound("유저를 찾을 수 없습니다.")
+
+	return user, nil
 }
 
 // 삭제
-func (c *UserController) DeleteUser(q query.Values) any {
+func (c *UserController) DeleteUser(
+	ctx context.Context,
+	q query.Values,
+) error {
 	userId := int(q.Int("id", 0))
-	c.userService.Delete(userId)
-	return map[string]string{"status": "삭제됨"}
+	return c.userService.Delete(ctx, userId)
 }

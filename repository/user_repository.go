@@ -1,32 +1,59 @@
 package repository
 
-type User struct {
-	ID   int
-	Name string
-}
+import (
+	"context"
+	"spine-user-demo/entity"
+
+	"github.com/uptrace/bun"
+)
 
 type UserRepository struct {
-	data map[int]User
+	db bun.IDB
 }
 
-func NewUserRepository() *UserRepository {
+func NewUserRepository(db bun.IDB) *UserRepository {
 	return &UserRepository{
-		data: map[int]User{
-			1: {ID: 1, Name: "spine-user"},
-		},
+		db: db,
 	}
 }
 
-func (r *UserRepository) FindByID(id int) (User, bool) {
-	user, ok := r.data[id]
-	return user, ok
+func (r *UserRepository) FindByID(ctx context.Context, id int) (*entity.User, error) {
+	user := new(entity.User)
+
+	err := r.db.NewSelect().
+		Model(user).
+		Where("id = ?", id).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
-func (r *UserRepository) Save(user User) User {
-	r.data[user.ID] = user
-	return user
+func (r *UserRepository) Save(ctx context.Context, user *entity.User) error {
+	_, err := r.db.NewInsert().
+		Model(user).
+		Exec(ctx)
+
+	return err
 }
 
-func (r *UserRepository) Delete(id int) {
-	delete(r.data, id)
+func (r *UserRepository) Update(ctx context.Context, user *entity.User) error {
+	_, err := r.db.NewUpdate().
+		Model(user).
+		WherePK().
+		Exec(ctx)
+
+	return err
+}
+
+func (r *UserRepository) Delete(ctx context.Context, id int) error {
+	_, err := r.db.NewDelete().
+		Model((*entity.User)(nil)).
+		Where("id = ?", id).
+		Exec(ctx)
+
+	return err
 }
