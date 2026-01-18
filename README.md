@@ -1,6 +1,6 @@
 # spine-user-demo
 
-간단한 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM).
+간단한 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
 
 ## 둘러보기
 Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계약으로 삼는 실행 파이프라인 중심 프레임워크입니다.  
@@ -172,6 +172,7 @@ app.Interceptor(
    go run .
    ```
 3. 서버 주소: `http://localhost:8080`
+4. Swagger UI: `http://localhost:8080/swagger/index.html`
 
 ## 간단한 호출 예시
 - 조회

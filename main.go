@@ -16,9 +16,14 @@ import (
 	"github.com/NARUBROWN/spine"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/labstack/echo/v4"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/mysqldialect"
+
+	_ "spine-user-demo/docs"
 
 	"github.com/uptrace/bun/migrate"
 )
@@ -26,6 +31,11 @@ import (
 //go:embed migrations/*.sql
 var sqlMigrations embed.FS
 
+// @title Spine User Demo API
+// @version 0.2.0
+// @description Spine + Swaggo
+// @host localhost:8080
+// @BasePath /
 func main() {
 	// CLI 플래그로 마이그레이션만 실행하는 옵션 추가
 	migrateOnly := flag.Bool("migrate", false, "Run database migrations and exit")
@@ -71,6 +81,12 @@ func main() {
 
 	// 유저 라우트 등록
 	routes.RegisterUserRoutes(app)
+
+	// 스웨거 UI 등록
+	app.Transport(func(t any) {
+		e := t.(*echo.Echo)
+		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
+	})
 
 	app.Run(":8080")
 }

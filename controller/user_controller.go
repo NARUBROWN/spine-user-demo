@@ -18,7 +18,13 @@ func NewUserController(userService *service.UserService) *UserController {
 	return &UserController{userService: userService}
 }
 
-// 읽기
+// GetUser godoc
+// @Summary Get user
+// @Description Get a user by id
+// @Tags users
+// @Param id query int true "User ID"
+// @Success 200 {object} dto.CreateUserResponse
+// @Router /users [get]
 func (c *UserController) GetUser(
 	ctx context.Context,
 	q query.Values,
@@ -33,7 +39,13 @@ func (c *UserController) GetUser(
 	return user, nil
 }
 
-// 생성
+// CreateUser godoc
+// @Summary Create user
+// @Description Create a new user
+// @Tags users
+// @Param body body dto.CreateUserRequest true "Create user request"
+// @Success 200 {object} dto.CreateUserResponse
+// @Router /users [post]
 func (c *UserController) CreateUser(
 	ctx context.Context,
 	req dto.CreateUserRequest,
@@ -41,7 +53,14 @@ func (c *UserController) CreateUser(
 	return c.userService.Create(ctx, req.Name, req.Email)
 }
 
-// 수정
+// UpdateUser godoc
+// @Summary Update user
+// @Description Update user name
+// @Tags users
+// @Param id query int true "User ID"
+// @Param body body dto.UpdateUserRequest true "Update user request"
+// @Success 200 {object} dto.CreateUserResponse
+// @Router /users [put]
 func (c *UserController) UpdateUser(
 	ctx context.Context,
 	q query.Values,
@@ -57,7 +76,13 @@ func (c *UserController) UpdateUser(
 	return user, nil
 }
 
-// 삭제
+// DeleteUser godoc
+// @Summary Delete user
+// @Description Delete a user by id
+// @Tags users
+// @Param id query int true "User ID"
+// @Success 200
+// @Router /users [delete]
 func (c *UserController) DeleteUser(
 	ctx context.Context,
 	q query.Values,

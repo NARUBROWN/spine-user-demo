@@ -1,0 +1,105 @@
+basePath: /
+definitions:
+  dto.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  dto.CreateUserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  dto.UpdateUserRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Spine + Swaggo
+  title: Spine User Demo API
+  version: 0.2.0
+paths:
+  /users:
+    delete:
+      description: Delete a user by id
+      parameters:
+      - description: User ID
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+      summary: Delete user
+      tags:
+      - users
+    get:
+      description: Get a user by id
+      parameters:
+      - description: User ID
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CreateUserResponse'
+      summary: Get user
+      tags:
+      - users
+    post:
+      description: Create a new user
+      parameters:
+      - description: Create user request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateUserRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CreateUserResponse'
+      summary: Create user
+      tags:
+      - users
+    put:
+      description: Update user name
+      parameters:
+      - description: User ID
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: Update user request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateUserRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CreateUserResponse'
+      summary: Update user
+      tags:
+      - users
+swagger: "2.0"
