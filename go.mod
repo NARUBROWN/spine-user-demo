@@ -2,7 +2,7 @@ module spine-user-demo
 
 go 1.25.5
 
-require github.com/NARUBROWN/spine v0.1.3
+require github.com/NARUBROWN/spine v0.1.5
 
 require (
 	github.com/labstack/echo/v4 v4.15.0 // indirect

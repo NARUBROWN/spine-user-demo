@@ -56,6 +56,41 @@ func (c *UserController) CreateUser(req CreateUserRequest) (User, error) {
 }
 ```
 
+인터셉터 예시:
+- CORS는 Spine에서 제공하는 인터셉터를 사용하고, 나머지는 사용자가 직접 구현합니다.
+- 아래는 요청/응답 로깅을 위한 사용자 구현 예시입니다.
+
+```go
+type LoggingInterceptor struct{}
+
+func (i *LoggingInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
+    log.Printf("[Logging Interceptor][REQ] %s %s -> %s.%s", ctx.Method(), ctx.Path(), meta.ControllerType.Name(), meta.Method.Name)
+    return nil
+}
+
+func (i *LoggingInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {
+    log.Printf("[Logging Interceptor][RES] %s %s OK", ctx.Method(), ctx.Path())
+}
+
+func (i *LoggingInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
+    if err != nil {
+        log.Printf("[Logging Interceptor][ERR] %s %s : %v", ctx.Method(), ctx.Path(), err)
+    }
+}
+```
+
+등록 예시:
+```go
+app.Interceptor(
+    cors.New(cors.Config{
+        AllowOrigins: []string{"*"},
+        AllowMethods: []string{"GET", "POST", "OPTIONS"},
+        AllowHeaders: []string{"Content-Type"},
+    }),
+    &interceptor.LoggingInterceptor{},
+)
+```
+
 ## 요구사항
 - Go 1.25.5+
 
