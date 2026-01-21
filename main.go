@@ -12,9 +12,11 @@ import (
 	"spine-user-demo/repository"
 	"spine-user-demo/routes"
 	"spine-user-demo/service"
+	"time"
 
 	"github.com/NARUBROWN/spine"
 	"github.com/NARUBROWN/spine/interceptor/cors"
+	"github.com/NARUBROWN/spine/pkg/boot"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/labstack/echo/v4"
 
@@ -88,13 +90,17 @@ func main() {
 		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
 	})
 
-	app.Run(":8080")
+	app.Run(boot.Options{
+		Address:                ":8080",
+		EnableGracefulShutdown: true,
+		ShutdownTimeout:        10 * time.Second,
+	})
 }
 
 func newBunDB() *bun.DB {
 	sqldb, err := sql.Open(
 		"mysql",
-		"ID:PASSWORD@tcp(localhost:3306)/spine_demo?parseTime=true&loc=Local",
+		"root:test1234@tcp(localhost:3306)/spine_demo?parseTime=true&loc=Local",
 	)
 	if err != nil {
 		panic(err)

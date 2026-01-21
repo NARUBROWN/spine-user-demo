@@ -4,6 +4,8 @@ github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/NARUBROWN/spine v0.2.1 h1:DXQOj1rQeZrEAgokRdZPo9j/zt9exc/J9Zr2om8VLr8=
 github.com/NARUBROWN/spine v0.2.1/go.mod h1:p+wg4iQmGMo/XHe6Gfexi71J/JUzOlZl0MdUxRDisUI=
+github.com/NARUBROWN/spine v0.2.3 h1:wLhpv6qunHP3YLCVN4zSA9pEvqLNuloRMXe+nJwhQzw=
+github.com/NARUBROWN/spine v0.2.3/go.mod h1:p+wg4iQmGMo/XHe6Gfexi71J/JUzOlZl0MdUxRDisUI=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
