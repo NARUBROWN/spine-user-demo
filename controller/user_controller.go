@@ -48,8 +48,11 @@ func (c *UserController) GetUser(
 // @Router /users [post]
 func (c *UserController) CreateUser(
 	ctx context.Context,
-	req dto.CreateUserRequest,
+	req *dto.CreateUserRequest,
 ) (dto.CreateUserResponse, error) {
+	if req == nil {
+		return dto.CreateUserResponse{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
+	}
 	return c.userService.Create(ctx, req.Name, req.Email)
 }
 
@@ -64,8 +67,11 @@ func (c *UserController) CreateUser(
 func (c *UserController) UpdateUser(
 	ctx context.Context,
 	q query.Values,
-	req dto.UpdateUserRequest,
+	req *dto.UpdateUserRequest,
 ) (dto.CreateUserResponse, error) {
+	if req == nil {
+		return dto.CreateUserResponse{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
+	}
 	userId := int(q.Int("id", 0))
 
 	user, err := c.userService.Update(ctx, userId, req.Name)
