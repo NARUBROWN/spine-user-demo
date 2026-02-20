@@ -10,20 +10,29 @@ type LoggingInterceptor struct{}
 
 func (i *LoggingInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
 	log.Printf(
-		"[Logging Interceptor][REQ] %s %s -> %s.%s",
+		"[Logging Interceptor][REQ] %s %s",
 		ctx.Method(),
 		ctx.Path(),
-		meta.ControllerType.Name(),
-		meta.Method.Name,
 	)
 	return nil
 }
 
 func (i *LoggingInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {
+	controllerName := "<unresolved>"
+	methodName := "<unresolved>"
+	if meta.ControllerType != nil {
+		controllerName = meta.ControllerType.Name()
+	}
+	if meta.Method.Name != "" {
+		methodName = meta.Method.Name
+	}
+
 	log.Printf(
-		"[Logging Interceptor][RES] %s %s OK",
+		"[Logging Interceptor][RES] %s %s -> %s.%s OK",
 		ctx.Method(),
 		ctx.Path(),
+		controllerName,
+		methodName,
 	)
 }
 

@@ -7,6 +7,7 @@ import (
 	"spine-user-demo/service"
 
 	"github.com/NARUBROWN/spine/pkg/httperr"
+	"github.com/NARUBROWN/spine/pkg/httpx"
 	"github.com/NARUBROWN/spine/pkg/query"
 )
 
@@ -28,15 +29,17 @@ func NewUserController(userService *service.UserService) *UserController {
 func (c *UserController) GetUser(
 	ctx context.Context,
 	q query.Values,
-) (dto.CreateUserResponse, error) {
+) (httpx.Response[dto.CreateUserResponse], error) {
 	userId := int(q.Int("id", 0))
 
 	user, err := c.userService.Get(ctx, userId)
 	if err != nil {
-		return dto.CreateUserResponse{}, httperr.NotFound("유저를 찾을 수 없습니다.")
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 	}
 
-	return user, nil
+	return httpx.Response[dto.CreateUserResponse]{
+		Body: user,
+	}, nil
 }
 
 // CreateUser godoc
@@ -49,11 +52,17 @@ func (c *UserController) GetUser(
 func (c *UserController) CreateUser(
 	ctx context.Context,
 	req *dto.CreateUserRequest,
-) (dto.CreateUserResponse, error) {
+) (httpx.Response[dto.CreateUserResponse], error) {
 	if req == nil {
-		return dto.CreateUserResponse{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
 	}
-	return c.userService.Create(ctx, req.Name, req.Email)
+	user, err := c.userService.Create(ctx, req.Name, req.Email)
+	if err != nil {
+		return httpx.Response[dto.CreateUserResponse]{}, err
+	}
+	return httpx.Response[dto.CreateUserResponse]{
+		Body: user,
+	}, nil
 }
 
 // UpdateUser godoc
@@ -68,18 +77,20 @@ func (c *UserController) UpdateUser(
 	ctx context.Context,
 	q query.Values,
 	req *dto.UpdateUserRequest,
-) (dto.CreateUserResponse, error) {
+) (httpx.Response[dto.CreateUserResponse], error) {
 	if req == nil {
-		return dto.CreateUserResponse{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
 	}
 	userId := int(q.Int("id", 0))
 
 	user, err := c.userService.Update(ctx, userId, req.Name)
 	if err != nil {
-		return dto.CreateUserResponse{}, httperr.NotFound("유저를 찾을 수 없습니다.")
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 	}
 
-	return user, nil
+	return httpx.Response[dto.CreateUserResponse]{
+		Body: user,
+	}, nil
 }
 
 // DeleteUser godoc
