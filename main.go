@@ -91,7 +91,7 @@ func main() {
 	})
 
 	app.Run(boot.Options{
-		Address:                ":8080",
+		Address:                ":8000",
 		EnableGracefulShutdown: true,
 		ShutdownTimeout:        10 * time.Second,
 		HTTP: &boot.HTTPOptions{

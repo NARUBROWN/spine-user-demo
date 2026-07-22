@@ -9,6 +9,8 @@ import (
 	"github.com/NARUBROWN/spine/pkg/httperr"
 	"github.com/NARUBROWN/spine/pkg/httpx"
 	"github.com/NARUBROWN/spine/pkg/query"
+	"github.com/NARUBROWN/spine/pkg/spine"
+	"github.com/uptrace/bun"
 )
 
 type UserController struct {
@@ -52,11 +54,24 @@ func (c *UserController) GetUser(
 func (c *UserController) CreateUser(
 	ctx context.Context,
 	req *dto.CreateUserRequest,
+	spineCtx spine.Ctx,
 ) (httpx.Response[dto.CreateUserResponse], error) {
+	tx := bun.IDB(nil)
+
+	v, exists := spineCtx.Get("tx")
+	if !exists {
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.InternalServerError("트랜잭션이 존재하지 않습니다.")
+	}
+
+	tx, ok := v.(bun.IDB)
+	if !ok {
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.InternalServerError("트랜잭션 타입이 올바르지 않습니다.")
+	}
+
 	if req == nil {
 		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
 	}
-	user, err := c.userService.Create(ctx, req.Name, req.Email)
+	user, err := c.userService.Create(ctx, tx, req.Name, req.Email)
 	if err != nil {
 		return httpx.Response[dto.CreateUserResponse]{}, err
 	}
@@ -77,13 +92,26 @@ func (c *UserController) UpdateUser(
 	ctx context.Context,
 	q query.Values,
 	req *dto.UpdateUserRequest,
+	spineCtx spine.Ctx,
 ) (httpx.Response[dto.CreateUserResponse], error) {
+	tx := bun.IDB(nil)
+
+	v, exists := spineCtx.Get("tx")
+	if !exists {
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.InternalServerError("트랜잭션이 존재하지 않습니다.")
+	}
+
+	tx, ok := v.(bun.IDB)
+
+	if !ok {
+		return httpx.Response[dto.CreateUserResponse]{}, httperr.InternalServerError("트랜잭션 타입이 올바르지 않습니다.")
+	}
 	if req == nil {
 		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("요청 본문이 비어 있습니다.")
 	}
 	userId := int(q.Int("id", 0))
 
-	user, err := c.userService.Update(ctx, userId, req.Name)
+	user, err := c.userService.Update(ctx, tx, userId, req.Name)
 	if err != nil {
 		return httpx.Response[dto.CreateUserResponse]{}, httperr.NotFound("유저를 찾을 수 없습니다.")
 	}
@@ -103,7 +131,20 @@ func (c *UserController) UpdateUser(
 func (c *UserController) DeleteUser(
 	ctx context.Context,
 	q query.Values,
+	spineCtx spine.Ctx,
 ) error {
+	tx := bun.IDB(nil)
+
+	v, exists := spineCtx.Get("tx")
+	if !exists {
+		return httperr.InternalServerError("트랜잭션이 존재하지 않습니다.")
+	}
+
+	tx, ok := v.(bun.IDB)
+	if !ok {
+		return httperr.InternalServerError("트랜잭션 타입이 올바르지 않습니다.")
+	}
+
 	userId := int(q.Int("id", 0))
-	return c.userService.Delete(ctx, userId)
+	return c.userService.Delete(ctx, tx, userId)
 }

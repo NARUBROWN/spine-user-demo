@@ -32,16 +32,16 @@ func (r *UserRepository) FindByID(ctx context.Context, id int) (*entity.User, er
 	return user, nil
 }
 
-func (r *UserRepository) Save(ctx context.Context, user *entity.User) error {
-	_, err := r.db.NewInsert().
+func (r *UserRepository) Save(ctx context.Context, tx bun.IDB, user *entity.User) error {
+	_, err := tx.NewInsert().
 		Model(user).
 		Exec(ctx)
 
 	return err
 }
 
-func (r *UserRepository) Update(ctx context.Context, user *entity.User) error {
-	_, err := r.db.NewUpdate().
+func (r *UserRepository) Update(ctx context.Context, tx bun.IDB, user *entity.User) error {
+	_, err := tx.NewUpdate().
 		Model(user).
 		WherePK().
 		Exec(ctx)
@@ -49,8 +49,8 @@ func (r *UserRepository) Update(ctx context.Context, user *entity.User) error {
 	return err
 }
 
-func (r *UserRepository) Delete(ctx context.Context, id int) error {
-	_, err := r.db.NewDelete().
+func (r *UserRepository) Delete(ctx context.Context, tx bun.IDB, id int) error {
+	_, err := tx.NewDelete().
 		Model((*entity.User)(nil)).
 		Where("id = ?", id).
 		Exec(ctx)

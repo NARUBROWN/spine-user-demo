@@ -6,6 +6,8 @@ import (
 	"spine-user-demo/dto"
 	"spine-user-demo/entity"
 	"spine-user-demo/repository"
+
+	"github.com/uptrace/bun"
 )
 
 type UserService struct {
@@ -28,9 +30,9 @@ func (s *UserService) Get(ctx context.Context, id int) (dto.CreateUserResponse, 
 	}, err
 }
 
-func (s *UserService) Create(ctx context.Context, name string, email string) (dto.CreateUserResponse, error) {
+func (s *UserService) Create(ctx context.Context, tx bun.IDB, name string, email string) (dto.CreateUserResponse, error) {
 	user := &entity.User{Name: name, Email: email}
-	err := s.repo.Save(ctx, user)
+	err := s.repo.Save(ctx, tx, user)
 	if err != nil {
 		return dto.CreateUserResponse{}, err
 	}
@@ -41,14 +43,14 @@ func (s *UserService) Create(ctx context.Context, name string, email string) (dt
 	}, nil
 }
 
-func (s *UserService) Update(ctx context.Context, id int, name string) (dto.CreateUserResponse, error) {
+func (s *UserService) Update(ctx context.Context, tx bun.IDB, id int, name string) (dto.CreateUserResponse, error) {
 	user, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return dto.CreateUserResponse{}, err
 	}
 
 	user.Name = name
-	if err := s.repo.Update(ctx, user); err != nil {
+	if err := s.repo.Update(ctx, tx, user); err != nil {
 		return dto.CreateUserResponse{}, err
 	}
 
@@ -59,6 +61,6 @@ func (s *UserService) Update(ctx context.Context, id int, name string) (dto.Crea
 	}, nil
 }
 
-func (s *UserService) Delete(ctx context.Context, id int) error {
-	return s.repo.Delete(ctx, id)
+func (s *UserService) Delete(ctx context.Context, tx bun.IDB, id int) error {
+	return s.repo.Delete(ctx, tx, id)
 }
