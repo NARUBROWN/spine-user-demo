@@ -33,21 +33,31 @@ func (i *TxInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMe
 
 func (i *TxInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {}
 
-func (i *TxInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
+func (i *TxInterceptor) BeforeResponse(
+	ctx core.ExecutionContext,
+	meta core.HandlerMeta,
+	executionErr error,
+) error {
 	v, ok := ctx.Get("tx")
 	if !ok {
-		return
+		return nil
 	}
 
 	tx, ok := v.(bun.Tx)
 	if !ok {
-		return
+		return errors.New("execution context has an invalid transaction")
 	}
 
-	if err != nil {
-		_ = tx.Rollback()
-		return
+	if executionErr != nil {
+		return tx.Rollback()
 	}
 
-	_ = tx.Commit()
+	return tx.Commit()
+}
+
+func (i *TxInterceptor) AfterCompletion(
+	ctx core.ExecutionContext,
+	meta core.HandlerMeta,
+	err error,
+) {
 }

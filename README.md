@@ -7,7 +7,9 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 컨테이너 구성, 입력 해석, 반환 처리의 책임이 분리되어 있어 구조가 명확하고 테스트가 쉬운 것이 장점입니다.
 
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
-요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤 완료 시 커밋/롤백합니다.
+요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
+
+이 예제는 Spine `v0.5.0`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다.
 
 생성자 의존성 예시 (Repository -> Service):
 ```go
@@ -106,6 +108,10 @@ func (i *LoggingInterceptor) PostHandle(ctx core.ExecutionContext, meta core.Han
     )
 }
 
+func (i *LoggingInterceptor) BeforeResponse(ctx core.ExecutionContext, meta core.HandlerMeta, executionErr error) error {
+    return nil
+}
+
 func (i *LoggingInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
     if err != nil {
         log.Printf(
@@ -135,35 +141,38 @@ func (i *TxInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMe
     return nil
 }
 
-func (i *TxInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
+func (i *TxInterceptor) BeforeResponse(ctx core.ExecutionContext, meta core.HandlerMeta, executionErr error) error {
     v, ok := ctx.Get("tx")
     if !ok {
-        return
+        return nil
     }
 
     tx, ok := v.(bun.Tx)
     if !ok {
-        return
+        return errors.New("execution context has an invalid transaction")
     }
 
-    if err != nil {
-        _ = tx.Rollback()
-        return
+    if executionErr != nil {
+        return tx.Rollback()
     }
 
-    _ = tx.Commit()
+    return tx.Commit()
+}
+
+func (i *TxInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
 }
 ```
 
 등록 예시:
 ```go
-app.Interceptor(
-    (*interceptor.TxInterceptor)(nil),
+app.InterceptorFor(
+    boot.InterceptorHTTP,
     cors.New(cors.Config{
         AllowOrigins: []string{"*"},
-        AllowMethods: []string{"GET", "POST", "OPTIONS"},
+        AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
         AllowHeaders: []string{"Content-Type"},
     }),
+    (*interceptor.TxInterceptor)(nil),
     &interceptor.LoggingInterceptor{},
 )
 ```
@@ -172,16 +181,20 @@ app.Interceptor(
 - Go 1.25.5+
 
 ## 실행 방법
-1. 의존성 다운로드
+1. MySQL DSN 설정
+   ```sh
+   export SPINE_DEMO_MYSQL_DSN='root:change-me@tcp(localhost:3306)/spine_demo?parseTime=true&loc=Local'
+   ```
+2. 의존성 다운로드
    ```sh
    go mod download
    ```
-2. 서버 실행
+3. 서버 실행
    ```sh
    go run .
    ```
-3. 서버 주소: `http://localhost:8080`
-4. Swagger UI: `http://localhost:8080/swagger/index.html`
+4. 서버 주소: `http://localhost:8080`
+5. Swagger UI: `http://localhost:8080/swagger/index.html`
 
 ## 간단한 호출 예시
 - 조회

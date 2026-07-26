@@ -18,9 +18,13 @@ func NewUserRepository(db bun.IDB) *UserRepository {
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id int) (*entity.User, error) {
+	return r.FindByIDWith(ctx, r.db, id)
+}
+
+func (r *UserRepository) FindByIDWith(ctx context.Context, db bun.IDB, id int) (*entity.User, error) {
 	user := new(entity.User)
 
-	err := r.db.NewSelect().
+	err := db.NewSelect().
 		Model(user).
 		Where("id = ?", id).
 		Scan(ctx)

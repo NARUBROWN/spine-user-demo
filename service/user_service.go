@@ -44,7 +44,7 @@ func (s *UserService) Create(ctx context.Context, tx bun.IDB, name string, email
 }
 
 func (s *UserService) Update(ctx context.Context, tx bun.IDB, id int, name string) (dto.CreateUserResponse, error) {
-	user, err := s.repo.FindByID(ctx, id)
+	user, err := s.repo.FindByIDWith(ctx, tx, id)
 	if err != nil {
 		return dto.CreateUserResponse{}, err
 	}

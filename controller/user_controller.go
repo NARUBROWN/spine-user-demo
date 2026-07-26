@@ -21,7 +21,7 @@ func NewUserController(userService *service.UserService) *UserController {
 	return &UserController{userService: userService}
 }
 
-// GetUser godoc
+// GetUser는 ID로 사용자 정보를 조회합니다.
 // @Summary Get user
 // @Description Get a user by id
 // @Tags users
@@ -44,7 +44,7 @@ func (c *UserController) GetUser(
 	}, nil
 }
 
-// CreateUser godoc
+// CreateUser는 새 사용자를 생성합니다.
 // @Summary Create user
 // @Description Create a new user
 // @Tags users
@@ -80,7 +80,7 @@ func (c *UserController) CreateUser(
 	}, nil
 }
 
-// UpdateUser godoc
+// UpdateUser는 기존 사용자의 이름을 수정합니다.
 // @Summary Update user
 // @Description Update user name
 // @Tags users
@@ -121,7 +121,7 @@ func (c *UserController) UpdateUser(
 	}, nil
 }
 
-// DeleteUser godoc
+// DeleteUser는 ID로 사용자를 삭제합니다.
 // @Summary Delete user
 // @Description Delete a user by id
 // @Tags users

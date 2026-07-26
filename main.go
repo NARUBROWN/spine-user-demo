@@ -46,7 +46,11 @@ func main() {
 	// 마이그레이션 실행
 	if *migrateOnly {
 		fmt.Println("Running migrations...")
-		db := newBunDB()
+		db, err := openBunDB()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Database configuration failed: %v\n", err)
+			os.Exit(1)
+		}
 		if err := runMigrations(context.Background(), db); err != nil {
 			fmt.Fprintf(os.Stderr, "Migration failed: %v\n", err)
 			os.Exit(1)
@@ -67,17 +71,18 @@ func main() {
 	)
 
 	// 인터셉터 등록
-	app.Interceptor(
+	app.InterceptorFor(
+		boot.InterceptorHTTP,
+		cors.New(cors.Config{
+			AllowOrigins: []string{"*"},
+			AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders: []string{"Content-Type"},
+		}),
 		/*
 		 Constructor 등록 + WarmUp 단계에서 이미 생성된 TxInterceptor 인스턴스를
 		 실행 파이프라인에서 사용하도록 타입으로 참조합니다.
 		*/
 		(*interceptor.TxInterceptor)(nil),
-		cors.New(cors.Config{
-			AllowOrigins: []string{"*"},
-			AllowMethods: []string{"GET", "POST", "OPTIONS"},
-			AllowHeaders: []string{"Content-Type"},
-		}),
 		&interceptor.LoggingInterceptor{},
 	)
 
@@ -90,26 +95,42 @@ func main() {
 		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
 	})
 
-	app.Run(boot.Options{
-		Address:                ":8000",
+	if err := app.Run(boot.Options{
+		Address:                ":8080",
 		EnableGracefulShutdown: true,
 		ShutdownTimeout:        10 * time.Second,
 		HTTP: &boot.HTTPOptions{
 			DisableRecover: true,
 		},
-	})
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "Application failed: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func newBunDB() *bun.DB {
-	sqldb, err := sql.Open(
-		"mysql",
-		"root:test1234@tcp(localhost:3306)/spine_demo?parseTime=true&loc=Local",
-	)
+	db, err := openBunDB()
 	if err != nil {
 		panic(err)
 	}
-	db := bun.NewDB(sqldb, mysqldialect.New())
 	return db
+}
+
+func openBunDB() (*bun.DB, error) {
+	dsn := os.Getenv("SPINE_DEMO_MYSQL_DSN")
+	if dsn == "" {
+		return nil, fmt.Errorf("SPINE_DEMO_MYSQL_DSN is required")
+	}
+
+	sqldb, err := sql.Open(
+		"mysql",
+		dsn,
+	)
+	if err != nil {
+		return nil, err
+	}
+	db := bun.NewDB(sqldb, mysqldialect.New())
+	return db, nil
 }
 
 func runMigrations(ctx context.Context, db *bun.DB) error {
