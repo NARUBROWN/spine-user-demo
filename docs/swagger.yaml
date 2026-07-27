@@ -18,6 +18,11 @@ definitions:
       name:
         type: string
     type: object
+  dto.ErrorResponse:
+    properties:
+      message:
+        type: string
+    type: object
   dto.UpdateUserRequest:
     properties:
       email:
@@ -44,6 +49,14 @@ paths:
       responses:
         "200":
           description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Delete user
       tags:
       - users
@@ -60,6 +73,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.CreateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Get user
       tags:
       - users
@@ -77,6 +98,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.CreateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Create user
       tags:
       - users
@@ -99,6 +128,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.CreateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Update user
       tags:
       - users

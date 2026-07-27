@@ -2,16 +2,32 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"spine-user-demo/dto"
 	"spine-user-demo/entity"
 	"spine-user-demo/repository"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
 )
 
+var (
+	ErrUserNotFound     = errors.New("user not found")
+	ErrEmailAlreadyUsed = errors.New("email already used")
+)
+
+type userRepository interface {
+	FindByID(context.Context, int) (*entity.User, error)
+	FindByIDWith(context.Context, bun.IDB, int) (*entity.User, error)
+	Save(context.Context, bun.IDB, *entity.User) error
+	Update(context.Context, bun.IDB, *entity.User) error
+	Delete(context.Context, bun.IDB, int) error
+}
+
 type UserService struct {
-	repo *repository.UserRepository
+	repo userRepository
 }
 
 func NewUserService(repo *repository.UserRepository) *UserService {
@@ -21,6 +37,9 @@ func NewUserService(repo *repository.UserRepository) *UserService {
 func (s *UserService) Get(ctx context.Context, id int) (dto.CreateUserResponse, error) {
 	result, err := s.repo.FindByID(ctx, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return dto.CreateUserResponse{}, ErrUserNotFound
+		}
 		return dto.CreateUserResponse{}, err
 	}
 	return dto.CreateUserResponse{
@@ -34,6 +53,10 @@ func (s *UserService) Create(ctx context.Context, tx bun.IDB, name string, email
 	user := &entity.User{Name: name, Email: email}
 	err := s.repo.Save(ctx, tx, user)
 	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return dto.CreateUserResponse{}, ErrEmailAlreadyUsed
+		}
 		return dto.CreateUserResponse{}, err
 	}
 	return dto.CreateUserResponse{
@@ -46,6 +69,9 @@ func (s *UserService) Create(ctx context.Context, tx bun.IDB, name string, email
 func (s *UserService) Update(ctx context.Context, tx bun.IDB, id int, name string) (dto.CreateUserResponse, error) {
 	user, err := s.repo.FindByIDWith(ctx, tx, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return dto.CreateUserResponse{}, ErrUserNotFound
+		}
 		return dto.CreateUserResponse{}, err
 	}
 
@@ -62,5 +88,9 @@ func (s *UserService) Update(ctx context.Context, tx bun.IDB, id int, name strin
 }
 
 func (s *UserService) Delete(ctx context.Context, tx bun.IDB, id int) error {
-	return s.repo.Delete(ctx, tx, id)
+	err := s.repo.Delete(ctx, tx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrUserNotFound
+	}
+	return err
 }

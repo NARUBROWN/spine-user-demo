@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -17,7 +18,7 @@ import (
 	"github.com/NARUBROWN/spine"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	"github.com/NARUBROWN/spine/pkg/boot"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/labstack/echo/v4"
 
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -59,6 +60,40 @@ func main() {
 		return
 	}
 
+	app := newApplication()
+	options := applicationOptions()
+	if err := errors.Join(app.Validate(options), validateEnvironment()); err != nil {
+		fmt.Fprintf(os.Stderr, "Configuration validation failed: %v\n", err)
+		os.Exit(1)
+	}
+	if err := app.Run(options); err != nil {
+		fmt.Fprintf(os.Stderr, "Application failed: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func validateEnvironment() error {
+	dsn := os.Getenv("SPINE_DEMO_MYSQL_DSN")
+	if dsn == "" {
+		return boot.ValidationError(boot.ConfigIssue{
+			Path:    "Environment.SPINE_DEMO_MYSQL_DSN",
+			Code:    "REQUIRED",
+			Message: "MySQL DSN is required",
+			Hint:    "Set SPINE_DEMO_MYSQL_DSN before starting the application",
+		})
+	}
+	if _, err := mysql.ParseDSN(dsn); err != nil {
+		return boot.ValidationError(boot.ConfigIssue{
+			Path:    "Environment.SPINE_DEMO_MYSQL_DSN",
+			Code:    "INVALID_DSN",
+			Message: "MySQL DSN is invalid",
+			Hint:    "Use a go-sql-driver/mysql compatible DSN",
+		})
+	}
+	return nil
+}
+
+func newApplication() spine.App {
 	app := spine.New()
 
 	// 생성자 등록
@@ -94,17 +129,21 @@ func main() {
 		e := t.(*echo.Echo)
 		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
 	})
+	return app
+}
 
-	if err := app.Run(boot.Options{
-		Address:                ":8080",
+func applicationOptions() boot.Options {
+	address := os.Getenv("SPINE_DEMO_ADDRESS")
+	if address == "" {
+		address = ":8080"
+	}
+	return boot.Options{
+		Address:                address,
 		EnableGracefulShutdown: true,
 		ShutdownTimeout:        10 * time.Second,
 		HTTP: &boot.HTTPOptions{
 			DisableRecover: true,
 		},
-	}); err != nil {
-		fmt.Fprintf(os.Stderr, "Application failed: %v\n", err)
-		os.Exit(1)
 	}
 }
 

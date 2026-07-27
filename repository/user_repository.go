@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+
 	"spine-user-demo/entity"
 
 	"github.com/uptrace/bun"
@@ -54,10 +56,19 @@ func (r *UserRepository) Update(ctx context.Context, tx bun.IDB, user *entity.Us
 }
 
 func (r *UserRepository) Delete(ctx context.Context, tx bun.IDB, id int) error {
-	_, err := tx.NewDelete().
+	result, err := tx.NewDelete().
 		Model((*entity.User)(nil)).
 		Where("id = ?", id).
 		Exec(ctx)
-
-	return err
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
