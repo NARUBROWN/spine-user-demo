@@ -1,6 +1,6 @@
 # spine-user-demo
 
-Spine의 HTTP·DI·요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
+Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
 
 **[Spine CLI](https://github.com/NARUBROWN/spine-cli)로 빌드하고 검증한 예제입니다.**
 Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
@@ -31,7 +31,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 예제는 Spine `v0.5.1`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태·쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 예제는 Spine `v0.5.1`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -52,10 +52,10 @@ func NewUserRepository(db bun.IDB) *UserRepository {
 }
 
 type UserService struct {
-    repo *repository.UserRepository
+    repo userRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo *UserRepository) *UserService {
     return &UserService{repo: repo}
 }
 ```
@@ -223,22 +223,49 @@ Spine CLI 설치와 전체 사용법은 [공식 CLI 저장소](https://github.co
 ├── main.go                       # 플래그 처리, 환경 검증, 앱 실행
 ├── internal/
 │   ├── application/
-│   │   ├── application.go        # BuildApplication: DI·인터셉터·라우트·옵션
+│   │   ├── application.go        # BuildApplication: DB, 인터셉터, 모듈, 실행 옵션
 │   │   └── application_test.go
-│   └── database/
-│       ├── database.go           # DSN 검증과 실행 시점의 Bun 생성자
-│       └── database_test.go
+│   ├── database/
+│   │   ├── database.go           # DSN 검증과 실행 시점의 Bun 생성자
+│   │   └── database_test.go
+│   └── interceptor/             # HTTP 로깅과 요청 단위 트랜잭션
+├── src/user/                    # spine g resource user의 리소스 패키지
+│   ├── user_route.go            # Register: 사용자 생성자와 HTTP 라우트
+│   ├── user_controller.go
+│   ├── user_service.go
+│   ├── user_repository.go
+│   ├── *_test.go
+│   ├── dto/                     # 요청과 응답 타입, 입력 검증
+│   └── entity/                  # Bun 모델
 ├── migrations/
 │   ├── migrations.go            # SQL 임베딩과 명시적 마이그레이션 실행
 │   └── *.sql
-├── controller/ dto/ entity/ interceptor/ repository/ routes/ service/
 ├── e2e/
 └── scripts/e2e.sh
 ```
 
-기존 main의 앱 구성은 internal/application, DB 코드는 internal/database, SQL 임베딩과 실행은
-migrations/migrations.go로 옮겼습니다. main_test.go의 DSN 검증도 database 패키지로 이동했습니다.
-기존 도메인 패키지와 SQL 파일의 위치는 유지했습니다.
+`spine g resource user --no-register`로 생성한 파일에 기존 CRUD 구현을 옮겼습니다.
+`user.Register(app)`가 사용자 생성자와 HTTP 라우트를 함께 등록하고, `BuildApplication`은
+DB, 공통 인터셉터와 실행 옵션을 구성한 뒤 이 모듈을 연결합니다.
+
+| 이전 위치 | 현재 위치 |
+| --- | --- |
+| `controller/`, `service/`, `repository/` | `src/user/`의 같은 `user` 패키지 |
+| `routes/user_routes.go` | `src/user/user_route.go` |
+| `dto/`, `entity/` | `src/user/dto/`, `src/user/entity/` |
+| `interceptor/` | `internal/interceptor/` |
+
+DB 코드는 `internal/database/`, SQL 임베딩과 마이그레이션 실행 코드는
+`migrations/migrations.go`에 있습니다. SQL 파일은 기존 위치를 사용합니다.
+새 HTTP 리소스도 같은 규칙으로 추가할 수 있습니다.
+
+```sh
+spine g resource product --dry-run --json
+```
+
+생성 계획을 확인한 뒤 출력된 `base_hash`를 `--if-match`로 전달하면 `src/product/`를 생성하고
+`BuildApplication`에 `product.Register(app)`를 등록합니다. Bun 연동은 예제의 사용자 모듈처럼
+직접 구현해야 합니다. 생성기는 빈 저장소 구조를 제공합니다.
 
 DB 연결이나 마이그레이션 없이 다음 검사를 실행합니다.
 
@@ -252,7 +279,7 @@ spine contract probe --root . --json
 기존 DisableRecover 설정은 HTTP_RECOVERY_DISABLED 경고로 표시되며, --warnings-as-errors를
 붙이면 실패합니다. 테스트 라우트는 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1일 때만 계약과 앱에
 포함됩니다. CLI 검사와 서버 실행에 같은 환경변수를 전달해야 합니다. 부분 probe는 DB 연결이나
-실제 HTTP·인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
+실제 HTTP, 인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
 
 ## 실행 방법
 1. MySQL DSN 설정
@@ -302,9 +329,9 @@ spine contract probe --root . --json
 | 상황 | 상태 |
 | --- | --- |
 | 본문 누락, 빈 이름, 잘못된 이메일, `id <= 0` | `400 Bad Request` |
-| 존재하지 않는 사용자 조회·수정·삭제 | `404 Not Found` |
+| 존재하지 않는 사용자 조회, 수정, 삭제 | `404 Not Found` |
 | 이미 등록된 이메일로 생성 | `409 Conflict` |
-| 예상하지 못한 저장소·응답 준비 오류 | 본문에 내부 원인을 노출하지 않는 `500 Internal Server Error` |
+| 예상하지 못한 저장소, 응답 준비 오류 | 본문에 내부 원인을 노출하지 않는 `500 Internal Server Error` |
 
 ## Docker E2E
 

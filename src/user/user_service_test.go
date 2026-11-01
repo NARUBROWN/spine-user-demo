@@ -1,4 +1,4 @@
-package service
+package user
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"spine-user-demo/entity"
+	"spine-user-demo/src/user/entity"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"

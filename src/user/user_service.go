@@ -1,13 +1,12 @@
-package service
+package user
 
 import (
 	"context"
 	"database/sql"
 	"errors"
 
-	"spine-user-demo/dto"
-	"spine-user-demo/entity"
-	"spine-user-demo/repository"
+	"spine-user-demo/src/user/dto"
+	"spine-user-demo/src/user/entity"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
@@ -30,7 +29,7 @@ type UserService struct {
 	repo userRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo *UserRepository) *UserService {
 	return &UserService{repo: repo}
 }
 

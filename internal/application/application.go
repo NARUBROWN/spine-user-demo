@@ -4,12 +4,9 @@ import (
 	"os"
 	"time"
 
-	"spine-user-demo/controller"
-	"spine-user-demo/interceptor"
 	"spine-user-demo/internal/database"
-	"spine-user-demo/repository"
-	"spine-user-demo/routes"
-	"spine-user-demo/service"
+	"spine-user-demo/internal/interceptor"
+	"spine-user-demo/src/user"
 
 	"github.com/NARUBROWN/spine"
 	"github.com/NARUBROWN/spine/interceptor/cors"
@@ -24,9 +21,6 @@ func BuildApplication() (spine.App, boot.Options, error) {
 	app := spine.New()
 	app.Constructor(
 		database.NewBunDB,
-		repository.NewUserRepository,
-		service.NewUserService,
-		controller.NewUserController,
 		interceptor.NewTxInterceptor,
 	)
 	app.InterceptorFor(
@@ -39,7 +33,7 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		(*interceptor.TxInterceptor)(nil),
 		&interceptor.LoggingInterceptor{},
 	)
-	if err := routes.Register(app); err != nil {
+	if err := user.Register(app); err != nil {
 		return nil, boot.Options{}, err
 	}
 	app.Transport(func(transport any) {

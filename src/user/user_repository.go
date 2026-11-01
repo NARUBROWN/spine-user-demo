@@ -1,10 +1,10 @@
-package repository
+package user
 
 import (
 	"context"
 	"database/sql"
 
-	"spine-user-demo/entity"
+	"spine-user-demo/src/user/entity"
 
 	"github.com/uptrace/bun"
 )
