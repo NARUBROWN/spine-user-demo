@@ -2,6 +2,28 @@
 
 Spine의 HTTP·DI·요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
 
+**[Spine CLI](https://github.com/NARUBROWN/spine-cli)로 빌드하고 검증한 예제입니다.**
+Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
+새로운 Spine 프로젝트를 만들거나 이 예제를 확장하려면 [Spine CLI의 명령과 사용 예제](https://github.com/NARUBROWN/spine-cli#readme)를 확인하세요.
+
+## Spine CLI로 실행하기
+
+Go와 Spine CLI를 설치하고 [MySQL 연결 설정과 최초 마이그레이션](#실행-방법)을 마쳤다면,
+이 저장소 루트에서 다음 명령으로 개발 서버를 실행할 수 있습니다.
+
+```sh
+spine dev
+```
+
+서버는 기본적으로 `http://localhost:8080`에서 실행됩니다. 코드를 수정하면 CLI가 변경을 감지해
+자동으로 다시 빌드하고, 빌드가 성공하면 서버를 새 코드로 교체합니다.
+개발 서버를 실행 중인 터미널과 별도로, 다음 명령으로 실행 파일을 빌드하거나 계약과 코드를 검증할 수 있습니다.
+
+```sh
+spine build
+spine verify
+```
+
 ## 둘러보기
 Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계약으로 삼는 실행 파이프라인 중심 프레임워크입니다.  
 컨테이너 구성, 입력 해석, 반환 처리의 책임이 분리되어 있어 구조가 명확하고 테스트가 쉬운 것이 장점입니다.
@@ -188,6 +210,50 @@ app.InterceptorFor(
 ## 요구사항
 - Go 1.27.3 이상 (Go 1.27.x 검증 기준: 1.27.3)
 
+## Spine CLI 프로젝트 구조
+
+Spine CLI 설치와 전체 사용법은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
+이 예제의 계약 검증에는 이번 호환 보완이 포함된 개발 작업본이 필요합니다. 해당 `spine-cli` 소스
+디렉터리에서 `go install ./cmd/spine`으로 설치합니다.
+공개 `v0.1.4` 태그에는 환경변수 등록과 패키지별 핸들러 분석 보완이 포함되어 있지 않습니다.
+
+```text
+.
+├── spine.toml
+├── main.go                       # 플래그 처리, 환경 검증, 앱 실행
+├── internal/
+│   ├── application/
+│   │   ├── application.go        # BuildApplication: DI·인터셉터·라우트·옵션
+│   │   └── application_test.go
+│   └── database/
+│       ├── database.go           # DSN 검증과 실행 시점의 Bun 생성자
+│       └── database_test.go
+├── migrations/
+│   ├── migrations.go            # SQL 임베딩과 명시적 마이그레이션 실행
+│   └── *.sql
+├── controller/ dto/ entity/ interceptor/ repository/ routes/ service/
+├── e2e/
+└── scripts/e2e.sh
+```
+
+기존 main의 앱 구성은 internal/application, DB 코드는 internal/database, SQL 임베딩과 실행은
+migrations/migrations.go로 옮겼습니다. main_test.go의 DSN 검증도 database 패키지로 이동했습니다.
+기존 도메인 패키지와 SQL 파일의 위치는 유지했습니다.
+
+DB 연결이나 마이그레이션 없이 다음 검사를 실행합니다.
+
+```sh
+spine context --root . --json
+spine contract check --root . --json
+spine verify --root . --json
+spine contract probe --root . --json
+```
+
+기존 DisableRecover 설정은 HTTP_RECOVERY_DISABLED 경고로 표시되며, --warnings-as-errors를
+붙이면 실패합니다. 테스트 라우트는 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1일 때만 계약과 앱에
+포함됩니다. CLI 검사와 서버 실행에 같은 환경변수를 전달해야 합니다. 부분 probe는 DB 연결이나
+실제 HTTP·인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
+
 ## 실행 방법
 1. MySQL DSN 설정
    ```sh
@@ -197,12 +263,17 @@ app.InterceptorFor(
    ```sh
    go mod download
    ```
-3. 서버 실행
+3. 최초 실행 전 마이그레이션
    ```sh
-   go run .
+   go run . -migrate
    ```
-4. 서버 주소: `http://localhost:8080`
-5. Swagger UI: `http://localhost:8080/swagger/index.html`
+4. CLI로 서버 실행
+   ```sh
+   spine dev
+   # 또는 spine run / go run .
+   ```
+5. 서버 주소: `http://localhost:8080`
+6. Swagger UI: `http://localhost:8080/swagger/index.html`
 
 ## 간단한 호출 예시
 - 조회

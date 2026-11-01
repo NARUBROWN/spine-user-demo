@@ -7,7 +7,7 @@ import (
 	"github.com/NARUBROWN/spine"
 )
 
-func RegisterUserRoutes(app spine.App) {
+func Register(app spine.App) error {
 	app.Route("GET", "/users", (*controller.UserController).GetUser)
 	app.Route("POST", "/users", (*controller.UserController).CreateUser)
 	app.Route("PUT", "/users", (*controller.UserController).UpdateUser)
@@ -17,4 +17,5 @@ func RegisterUserRoutes(app spine.App) {
 		app.Route("POST", "/scenarios/transactions/controller-error", (*controller.UserController).CreateThenFail)
 		app.Route("POST", "/scenarios/transactions/response-error", (*controller.UserController).CreateWithInvalidCookie)
 	}
+	return nil
 }

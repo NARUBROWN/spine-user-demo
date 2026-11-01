@@ -1,0 +1,28 @@
+package application
+
+import "testing"
+
+func TestBuildApplicationWithoutDatabase(t *testing.T) {
+	t.Setenv("SPINE_DEMO_MYSQL_DSN", "")
+	app, options, err := BuildApplication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Validate(options); err != nil {
+		t.Fatalf("offline application validation: %v", err)
+	}
+}
+
+func TestApplicationAddressPrecedence(t *testing.T) {
+	t.Setenv("SPINE_PORT", "18084")
+	t.Setenv("SPINE_DEMO_ADDRESS", "")
+	_, options, err := BuildApplication()
+	if err != nil || options.Address != ":18084" {
+		t.Fatalf("CLI address = %q, error = %v", options.Address, err)
+	}
+	t.Setenv("SPINE_DEMO_ADDRESS", "127.0.0.1:19084")
+	_, options, err = BuildApplication()
+	if err != nil || options.Address != "127.0.0.1:19084" {
+		t.Fatalf("explicit address = %q, error = %v", options.Address, err)
+	}
+}

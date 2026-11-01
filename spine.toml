@@ -1,0 +1,4 @@
+module = "spine-user-demo"
+entrypoint = "."
+composition = "./internal/application"
+port = 8080
