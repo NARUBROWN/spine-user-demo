@@ -31,7 +31,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 예제는 Spine `v0.5.1`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 예제는 Spine `v0.6.0`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -47,7 +47,7 @@ type UserRepository struct {
     db bun.IDB
 }
 
-func NewUserRepository(db bun.IDB) *UserRepository {
+func NewUserRepository(db *bun.DB) *UserRepository {
     return &UserRepository{db: db}
 }
 
@@ -55,7 +55,7 @@ type UserService struct {
     repo userRepository
 }
 
-func NewUserService(repo *UserRepository) *UserService {
+func NewUserService(repo *repository.UserRepository) *UserService {
     return &UserService{repo: repo}
 }
 ```
@@ -71,15 +71,15 @@ func NewUserService(repo *UserRepository) *UserService {
 func (c *UserController) GetUser(
     ctx context.Context,
     q query.Values,
-) (dto.CreateUserResponse, error) {
+) (httpx.Response[dto.CreateUserResponse], error) {
     userId := int(q.Int("id", 0))
 
     user, err := c.userService.Get(ctx, userId)
     if err != nil {
-        return dto.CreateUserResponse{}, httperr.NotFound("유저를 찾을 수 없습니다.")
+        return httpx.Response[dto.CreateUserResponse]{}, httperr.NotFound("유저를 찾을 수 없습니다.")
     }
 
-    return user, nil
+    return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
 }
 ```
 
@@ -208,64 +208,61 @@ app.InterceptorFor(
 ```
 
 ## 권장 환경
-- 권장 Go 버전: 1.27.3
+- 최소 Go 버전: 1.25.5
+- 검증한 Go 버전: 1.26.0
 
 ## Spine CLI 프로젝트 구조
 
-Spine CLI 설치와 전체 사용법은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
-이 예제의 계약 검증에는 이번 호환 보완이 포함된 개발 작업본이 필요합니다. 해당 `spine-cli` 소스
-디렉터리에서 `go install ./cmd/spine`으로 설치합니다.
-공개 `v0.1.4` 태그에는 환경변수 등록과 패키지별 핸들러 분석 보완이 포함되어 있지 않습니다.
+공개 Spine CLI `v0.4.1`로 새 프로젝트를 생성하고 기존 API와 처리 로직을 이식했습니다.
+Go `1.25.5` 이상에서 다음 명령으로 같은 CLI를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
+
+```sh
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.1
+spine version
+# spine-cli 0.4.1
+```
+
+HTTP 앱은 Spine `v0.6.0`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합니다.
+설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
+
+`spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
+만든 뼈대에 기존 Bun CRUD, 검증, 오류 매핑과 트랜잭션 처리를 옮겼습니다.
+`spine g route`로 기존 HTTP 메서드와 경로를 명시적으로 등록했습니다.
 
 ```text
 .
-├── spine.toml
-├── main.go                       # 플래그 처리, 환경 검증, 앱 실행
+├── spine.toml                     # layered-v1, Echo 플랫폼, 구성 패키지
+├── main.go                        # 마이그레이션 플래그, 환경 검증과 실행
+├── database/domain/user.go        # 기존 Bun 모델과 테이블 매핑
 ├── internal/
-│   ├── application/
-│   │   ├── application.go        # BuildApplication: DB, 인터셉터, 모듈, 실행 옵션
-│   │   └── application_test.go
-│   ├── database/
-│   │   ├── database.go           # DSN 검증과 실행 시점의 Bun 생성자
-│   │   └── database_test.go
-│   └── interceptor/             # HTTP 로깅과 요청 단위 트랜잭션
-├── src/user/                    # spine g resource user의 리소스 패키지
-│   ├── user_route.go            # Register: 사용자 생성자와 HTTP 라우트
-│   ├── user_controller.go
-│   ├── user_service.go
-│   ├── user_repository.go
-│   ├── *_test.go
-│   ├── dto/                     # 요청과 응답 타입, 입력 검증
-│   └── entity/                  # Bun 모델
-├── migrations/
-│   ├── migrations.go            # SQL 임베딩과 명시적 마이그레이션 실행
-│   └── *.sql
+│   ├── application/               # 플랫폼, 생성자, 인터셉터, 라우트 연결
+│   ├── database/                  # DSN 검증과 지연 Bun 생성자
+│   └── interceptor/               # HTTP 로깅과 요청 단위 트랜잭션
+├── src/
+│   ├── controller/                # 사용자 HTTP 핸들러
+│   ├── service/                   # CRUD와 오류 매핑
+│   ├── repository/                # Bun 쿼리
+│   ├── dto/                       # 요청, 응답과 입력 검증
+│   └── route/route.go             # 사용자 라우트와 선택적 실패 시나리오
+├── migrations/                    # 기존 SQL과 마이그레이션 실행
+├── docs/                          # Swagger 문서
 ├── e2e/
 └── scripts/e2e.sh
 ```
 
-`spine g resource user --no-register`로 생성한 파일에 기존 CRUD 구현을 옮겼습니다.
-`user.Register(app)`가 사용자 생성자와 HTTP 라우트를 함께 등록하고, `BuildApplication`은
-DB, 공통 인터셉터와 실행 옵션을 구성한 뒤 이 모듈을 연결합니다.
+생성자는 `BuildApplication`에서 연결하고, HTTP 경로는 `route.Register(app)`로 등록합니다.
+`platform.New(platform.WithEcho(...))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
+`BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
-| 이전 위치 | 현재 위치 |
-| --- | --- |
-| `controller/`, `service/`, `repository/` | `src/user/`의 같은 `user` 패키지 |
-| `routes/user_routes.go` | `src/user/user_route.go` |
-| `dto/`, `entity/` | `src/user/dto/`, `src/user/entity/` |
-| `interceptor/` | `internal/interceptor/` |
-
-DB 코드는 `internal/database/`, SQL 임베딩과 마이그레이션 실행 코드는
-`migrations/migrations.go`에 있습니다. SQL 파일은 기존 위치를 사용합니다.
-새 HTTP 리소스도 같은 규칙으로 추가할 수 있습니다.
+새 리소스의 생성 계획도 같은 방식으로 확인할 수 있습니다.
 
 ```sh
 spine g resource product --dry-run --json
 ```
 
-생성 계획을 확인한 뒤 출력된 `base_hash`를 `--if-match`로 전달하면 `src/product/`를 생성하고
-`BuildApplication`에 `product.Register(app)`를 등록합니다. Bun 연동은 예제의 사용자 모듈처럼
-직접 구현해야 합니다. 생성기는 빈 저장소 구조를 제공합니다.
+출력의 `changes`, `diff`, `base_hash`를 확인한 뒤 같은 명령에 `--if-match <base_hash>`를
+전달합니다. 리소스 생성기는 domain, repository, service, controller를 생성하고 생성자를
+연결합니다. DTO와 HTTP 경로는 별도로 추가하며, Bun 쿼리와 트랜잭션은 직접 구현합니다.
 
 DB 연결이나 마이그레이션 없이 다음 검사를 실행합니다.
 

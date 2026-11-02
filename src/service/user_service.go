@@ -1,12 +1,13 @@
-package user
+package service
 
 import (
 	"context"
 	"database/sql"
 	"errors"
 
-	"spine-user-demo/src/user/dto"
-	"spine-user-demo/src/user/entity"
+	"spine-user-demo/database/domain"
+	"spine-user-demo/src/dto"
+	"spine-user-demo/src/repository"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
@@ -18,10 +19,10 @@ var (
 )
 
 type userRepository interface {
-	FindByID(context.Context, int) (*entity.User, error)
-	FindByIDWith(context.Context, bun.IDB, int) (*entity.User, error)
-	Save(context.Context, bun.IDB, *entity.User) error
-	Update(context.Context, bun.IDB, *entity.User) error
+	FindByID(context.Context, int) (*domain.User, error)
+	FindByIDWith(context.Context, bun.IDB, int) (*domain.User, error)
+	Save(context.Context, bun.IDB, *domain.User) error
+	Update(context.Context, bun.IDB, *domain.User) error
 	Delete(context.Context, bun.IDB, int) error
 }
 
@@ -29,7 +30,7 @@ type UserService struct {
 	repo userRepository
 }
 
-func NewUserService(repo *UserRepository) *UserService {
+func NewUserService(repo *repository.UserRepository) *UserService {
 	return &UserService{repo: repo}
 }
 
@@ -49,7 +50,7 @@ func (s *UserService) Get(ctx context.Context, id int) (dto.CreateUserResponse, 
 }
 
 func (s *UserService) Create(ctx context.Context, tx bun.IDB, name string, email string) (dto.CreateUserResponse, error) {
-	user := &entity.User{Name: name, Email: email}
+	user := &domain.User{Name: name, Email: email}
 	err := s.repo.Save(ctx, tx, user)
 	if err != nil {
 		var mysqlErr *mysql.MySQLError

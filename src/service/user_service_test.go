@@ -1,4 +1,4 @@
-package user
+package service
 
 import (
 	"context"
@@ -6,32 +6,32 @@ import (
 	"errors"
 	"testing"
 
-	"spine-user-demo/src/user/entity"
+	"spine-user-demo/database/domain"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
 )
 
 type fakeUserRepository struct {
-	findResult *entity.User
+	findResult *domain.User
 	findErr    error
 	saveErr    error
 	deleteErr  error
 }
 
-func (r *fakeUserRepository) FindByID(context.Context, int) (*entity.User, error) {
+func (r *fakeUserRepository) FindByID(context.Context, int) (*domain.User, error) {
 	return r.findResult, r.findErr
 }
 
-func (r *fakeUserRepository) FindByIDWith(context.Context, bun.IDB, int) (*entity.User, error) {
+func (r *fakeUserRepository) FindByIDWith(context.Context, bun.IDB, int) (*domain.User, error) {
 	return r.findResult, r.findErr
 }
 
-func (r *fakeUserRepository) Save(context.Context, bun.IDB, *entity.User) error {
+func (r *fakeUserRepository) Save(context.Context, bun.IDB, *domain.User) error {
 	return r.saveErr
 }
 
-func (*fakeUserRepository) Update(context.Context, bun.IDB, *entity.User) error { return nil }
+func (*fakeUserRepository) Update(context.Context, bun.IDB, *domain.User) error { return nil }
 
 func (r *fakeUserRepository) Delete(context.Context, bun.IDB, int) error {
 	return r.deleteErr

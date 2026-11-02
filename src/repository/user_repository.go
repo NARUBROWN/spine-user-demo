@@ -1,10 +1,10 @@
-package user
+package repository
 
 import (
 	"context"
 	"database/sql"
 
-	"spine-user-demo/src/user/entity"
+	"spine-user-demo/database/domain"
 
 	"github.com/uptrace/bun"
 )
@@ -13,18 +13,18 @@ type UserRepository struct {
 	db bun.IDB
 }
 
-func NewUserRepository(db bun.IDB) *UserRepository {
+func NewUserRepository(db *bun.DB) *UserRepository {
 	return &UserRepository{
 		db: db,
 	}
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id int) (*entity.User, error) {
+func (r *UserRepository) FindByID(ctx context.Context, id int) (*domain.User, error) {
 	return r.FindByIDWith(ctx, r.db, id)
 }
 
-func (r *UserRepository) FindByIDWith(ctx context.Context, db bun.IDB, id int) (*entity.User, error) {
-	user := new(entity.User)
+func (r *UserRepository) FindByIDWith(ctx context.Context, db bun.IDB, id int) (*domain.User, error) {
+	user := new(domain.User)
 
 	err := db.NewSelect().
 		Model(user).
@@ -38,7 +38,7 @@ func (r *UserRepository) FindByIDWith(ctx context.Context, db bun.IDB, id int) (
 	return user, nil
 }
 
-func (r *UserRepository) Save(ctx context.Context, tx bun.IDB, user *entity.User) error {
+func (r *UserRepository) Save(ctx context.Context, tx bun.IDB, user *domain.User) error {
 	_, err := tx.NewInsert().
 		Model(user).
 		Exec(ctx)
@@ -46,7 +46,7 @@ func (r *UserRepository) Save(ctx context.Context, tx bun.IDB, user *entity.User
 	return err
 }
 
-func (r *UserRepository) Update(ctx context.Context, tx bun.IDB, user *entity.User) error {
+func (r *UserRepository) Update(ctx context.Context, tx bun.IDB, user *domain.User) error {
 	_, err := tx.NewUpdate().
 		Model(user).
 		WherePK().
@@ -57,7 +57,7 @@ func (r *UserRepository) Update(ctx context.Context, tx bun.IDB, user *entity.Us
 
 func (r *UserRepository) Delete(ctx context.Context, tx bun.IDB, id int) error {
 	result, err := tx.NewDelete().
-		Model((*entity.User)(nil)).
+		Model((*domain.User)(nil)).
 		Where("id = ?", id).
 		Exec(ctx)
 	if err != nil {

@@ -1,11 +1,12 @@
-package user
+package controller
 
 import (
 	"context"
 	"errors"
 	"net/http"
 
-	"spine-user-demo/src/user/dto"
+	"spine-user-demo/src/dto"
+	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine/pkg/httperr"
 	"github.com/NARUBROWN/spine/pkg/httpx"
@@ -25,7 +26,7 @@ type userService interface {
 	Delete(context.Context, bun.IDB, int) error
 }
 
-func NewUserController(userService *UserService) *UserController {
+func NewUserController(userService *service.UserService) *UserController {
 	return &UserController{userService: userService}
 }
 
@@ -211,9 +212,9 @@ func transactionFrom(spineCtx spine.Ctx) (bun.IDB, error) {
 
 func mapServiceError(err error) error {
 	switch {
-	case errors.Is(err, ErrUserNotFound):
+	case errors.Is(err, service.ErrUserNotFound):
 		return httperr.NotFound("유저를 찾을 수 없습니다.")
-	case errors.Is(err, ErrEmailAlreadyUsed):
+	case errors.Is(err, service.ErrEmailAlreadyUsed):
 		return &httperr.HTTPError{Status: http.StatusConflict, Message: "이미 사용 중인 이메일입니다."}
 	default:
 		return err

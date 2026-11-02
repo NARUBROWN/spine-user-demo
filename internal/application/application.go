@@ -6,21 +6,30 @@ import (
 
 	"spine-user-demo/internal/database"
 	"spine-user-demo/internal/interceptor"
-	"spine-user-demo/src/user"
+	"spine-user-demo/src/controller"
+	"spine-user-demo/src/repository"
+	"spine-user-demo/src/route"
+	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine"
+	platform "github.com/NARUBROWN/spine-echo-platform"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	"github.com/NARUBROWN/spine/pkg/boot"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	httpSwagger "github.com/swaggo/http-swagger"
 	_ "spine-user-demo/docs"
 )
 
 // BuildApplication은 서버와 CLI가 공유하는 구성 진입점이며 DB 연결이나 리스너를 시작하지 않습니다.
 func BuildApplication() (spine.App, boot.Options, error) {
-	app := spine.New()
+	app := platform.New(platform.WithEcho(func(e *echo.Echo) {
+		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
+	}))
 	app.Constructor(
 		database.NewBunDB,
+		repository.NewUserRepository,
+		service.NewUserService,
+		controller.NewUserController,
 		interceptor.NewTxInterceptor,
 	)
 	app.InterceptorFor(
@@ -33,13 +42,9 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		(*interceptor.TxInterceptor)(nil),
 		&interceptor.LoggingInterceptor{},
 	)
-	if err := user.Register(app); err != nil {
+	if err := route.Register(app); err != nil {
 		return nil, boot.Options{}, err
 	}
-	app.Transport(func(transport any) {
-		e := transport.(*echo.Echo)
-		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
-	})
 
 	address := os.Getenv("SPINE_DEMO_ADDRESS")
 	if address == "" {

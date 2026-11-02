@@ -1,4 +1,4 @@
-package user
+package controller
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"spine-user-demo/src/user/dto"
+	"spine-user-demo/src/dto"
+	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine/pkg/httperr"
 	"github.com/NARUBROWN/spine/pkg/query"
@@ -42,7 +43,7 @@ func TestGetUserRejectsInvalidID(t *testing.T) {
 }
 
 func TestGetUserMapsNotFound(t *testing.T) {
-	controller := &UserController{userService: &fakeUserService{getErr: ErrUserNotFound}}
+	controller := &UserController{userService: &fakeUserService{getErr: service.ErrUserNotFound}}
 	_, err := controller.GetUser(context.Background(), query.NewValues(map[string][]string{"id": {"123"}}))
 	assertHTTPStatus(t, err, http.StatusNotFound)
 }
@@ -54,7 +55,7 @@ func TestCreateUserValidatesBeforeTransactionLookup(t *testing.T) {
 }
 
 func TestMapServiceErrorMapsDuplicateEmail(t *testing.T) {
-	assertHTTPStatus(t, mapServiceError(ErrEmailAlreadyUsed), http.StatusConflict)
+	assertHTTPStatus(t, mapServiceError(service.ErrEmailAlreadyUsed), http.StatusConflict)
 }
 
 func assertHTTPStatus(t *testing.T, err error, want int) {

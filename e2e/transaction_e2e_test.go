@@ -5,6 +5,7 @@ package e2e
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,11 @@ func TestHTTPContractsAndTransactionBoundaries(t *testing.T) {
 	db := openDB(t, requiredEnv(t, "SPINE_DEMO_MYSQL_DSN"))
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	successEmail := "success-" + suffix + "@example.com"
+	var createdUser struct {
+		ID    int    `json:"id"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
 	controllerErrorEmail := "controller-error-" + suffix + "@example.com"
 	responseErrorEmail := "response-error-" + suffix + "@example.com"
 	for _, email := range []string{successEmail, controllerErrorEmail, responseErrorEmail} {
@@ -29,10 +35,24 @@ func TestHTTPContractsAndTransactionBoundaries(t *testing.T) {
 		t.Cleanup(func() { _, _ = db.Exec("DELETE FROM users WHERE email = ?", email) })
 	}
 
+	t.Run("native Swagger route serves the API document", func(t *testing.T) {
+		status, body := requestJSON(t, http.MethodGet, baseURL+"/swagger/doc.json", "")
+		assertStatus(t, status, http.StatusOK)
+		var document struct {
+			Paths map[string]json.RawMessage `json:"paths"`
+		}
+		if err := json.Unmarshal([]byte(body), &document); err != nil || document.Paths["/users"] == nil {
+			t.Fatalf("Swagger user API document: %v, body=%s", err, body)
+		}
+	})
+
 	t.Run("successful response commits", func(t *testing.T) {
-		status, _ := postJSON(t, baseURL+"/users", userJSON("Alice", successEmail))
+		status, body := postJSON(t, baseURL+"/users", userJSON("Alice", successEmail))
 		assertStatus(t, status, http.StatusOK)
 		assertUserCount(t, db, successEmail, 1)
+		if err := json.Unmarshal([]byte(body), &createdUser); err != nil || createdUser.ID <= 0 || createdUser.Name != "Alice" || createdUser.Email != successEmail {
+			t.Fatalf("created user: %#v, error=%v, body=%s", createdUser, err, body)
+		}
 	})
 
 	t.Run("invalid input returns 400", func(t *testing.T) {
@@ -66,6 +86,37 @@ func TestHTTPContractsAndTransactionBoundaries(t *testing.T) {
 		assertStatus(t, status, http.StatusInternalServerError)
 		assertUserCount(t, db, responseErrorEmail, 0)
 	})
+
+	t.Run("read update and delete preserve the CRUD contract", func(t *testing.T) {
+		if createdUser.ID <= 0 {
+			t.Fatal("successful creation is required for the CRUD round trip")
+		}
+		endpoint := fmt.Sprintf("%s/users?id=%d", baseURL, createdUser.ID)
+		status, body := requestJSON(t, http.MethodGet, endpoint, "")
+		assertStatus(t, status, http.StatusOK)
+		var user struct {
+			ID    int    `json:"id"`
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		}
+		if err := json.Unmarshal([]byte(body), &user); err != nil || user != createdUser {
+			t.Fatalf("read user: %#v, error=%v, body=%s", user, err, body)
+		}
+		status, _ = requestJSON(t, http.MethodPut, endpoint, `{"name":"Bob"}`)
+		assertStatus(t, status, http.StatusOK)
+		status, body = requestJSON(t, http.MethodGet, endpoint, "")
+		assertStatus(t, status, http.StatusOK)
+		if err := json.Unmarshal([]byte(body), &user); err != nil || user.Name != "Bob" || user.Email != successEmail || user.ID != createdUser.ID {
+			t.Fatalf("updated user: %#v, error=%v, body=%s", user, err, body)
+		}
+		status, _ = requestJSON(t, http.MethodDelete, endpoint, "")
+		assertStatus(t, status, http.StatusOK)
+		assertUserCount(t, db, successEmail, 0)
+		for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete} {
+			status, _ = requestJSON(t, method, endpoint, `{"name":"Bob"}`)
+			assertStatus(t, status, http.StatusNotFound)
+		}
+	})
 }
 
 func requiredEnv(t *testing.T, name string) string {
@@ -96,10 +147,20 @@ func userJSON(name string, email string) string {
 
 func postJSON(t *testing.T, endpoint string, body string) (int, string) {
 	t.Helper()
+	return requestJSON(t, http.MethodPost, endpoint, body)
+}
+
+func requestJSON(t *testing.T, method, endpoint, body string) (int, string) {
+	t.Helper()
 	if _, err := url.ParseRequestURI(endpoint); err != nil {
 		t.Fatal(err)
 	}
-	response, err := http.Post(endpoint, "application/json", bytes.NewBufferString(body))
+	request, err := http.NewRequest(method, endpoint, bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
 	}
