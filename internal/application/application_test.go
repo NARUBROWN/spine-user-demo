@@ -2,6 +2,14 @@ package application
 
 import "testing"
 
+func TestSecurityScenarioRequiresToken(t *testing.T) {
+	t.Setenv("SPINE_DEMO_ENABLE_SECURITY_SCENARIOS", "1")
+	t.Setenv("SPINE_DEMO_SECURITY_TOKEN", "")
+	if _, _, err := BuildApplication(); err == nil {
+		t.Fatal("security scenario must reject an empty token")
+	}
+}
+
 func TestBuildApplicationWithoutDatabase(t *testing.T) {
 	t.Setenv("SPINE_DEMO_MYSQL_DSN", "")
 	app, options, err := BuildApplication()

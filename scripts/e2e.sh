@@ -29,6 +29,8 @@ SPINE_DEMO_MYSQL_DSN="${mysql_dsn}" "${server_binary}" -migrate
 SPINE_DEMO_MYSQL_DSN="${mysql_dsn}" \
 SPINE_DEMO_ADDRESS="127.0.0.1:${http_port}" \
 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1 \
+SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1 \
+SPINE_DEMO_SECURITY_TOKEN="local-e2e-token" \
 "${server_binary}" &
 server_pid=$!
 
@@ -51,4 +53,5 @@ fi
 
 SPINE_DEMO_MYSQL_DSN="${mysql_dsn}" \
 SPINE_DEMO_E2E_BASE_URL="http://127.0.0.1:${http_port}" \
+SPINE_DEMO_E2E_SECURITY_TOKEN="local-e2e-token" \
 go test -count=1 -tags=e2e -v ./e2e

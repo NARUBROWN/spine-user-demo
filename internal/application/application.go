@@ -12,7 +12,7 @@ import (
 	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine"
-	platform "github.com/NARUBROWN/spine-echo-platform"
+	echoplatform "github.com/NARUBROWN/spine-echo-platform"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	"github.com/NARUBROWN/spine/pkg/boot"
 	"github.com/labstack/echo/v5"
@@ -22,9 +22,9 @@ import (
 
 // BuildApplication은 서버와 CLI가 공유하는 구성 진입점이며 DB 연결이나 리스너를 시작하지 않습니다.
 func BuildApplication() (spine.App, boot.Options, error) {
-	app := platform.New(platform.WithEcho(func(e *echo.Echo) {
+	app := spine.New(echoplatform.Option(echoplatform.WithEcho(func(e *echo.Echo) {
 		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
-	}))
+	})))
 	app.Constructor(
 		database.NewBunDB,
 		repository.NewUserRepository,
@@ -58,6 +58,6 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		Address:                address,
 		EnableGracefulShutdown: true,
 		ShutdownTimeout:        10 * time.Second,
-		HTTP:                   &boot.HTTPOptions{DisableRecover: true},
+		HTTP:                   &boot.HTTPOptions{},
 	}, nil
 }

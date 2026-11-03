@@ -31,7 +31,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 예제는 Spine `v0.6.0`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 예제는 Spine `v0.6.5`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -213,16 +213,16 @@ app.InterceptorFor(
 
 ## Spine CLI 프로젝트 구조
 
-공개 Spine CLI `v0.4.1`로 새 프로젝트를 생성하고 기존 API와 처리 로직을 이식했습니다.
+공개 Spine CLI `v0.4.2`의 플랫폼 조립 방식과 Spine `v0.6.5`에 맞춰 기존 API와 처리 로직을 구성했습니다.
 Go `1.25.5` 이상에서 다음 명령으로 같은 CLI를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.1
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.2
 spine version
-# spine-cli 0.4.1
+# spine-cli 0.4.2
 ```
 
-HTTP 앱은 Spine `v0.6.0`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합니다.
+HTTP 앱은 Spine `v0.6.5`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
 `spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
@@ -251,8 +251,18 @@ HTTP 앱은 Spine `v0.6.0`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합�
 ```
 
 생성자는 `BuildApplication`에서 연결하고, HTTP 경로는 `route.Register(app)`로 등록합니다.
-`platform.New(platform.WithEcho(...))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
+`spine.New(echoplatform.Option(echoplatform.WithEcho(...)))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
+
+`spine.toml`에는 `recipe = "platform-contracts-v0.6.5"`, `websocket_platform = "none"`,
+`validator = "none"`을 기록합니다. 기존 DTO 검증과 HTTP 오류 처리를 유지하며 별도 검증기는 선택하지 않습니다.
+`spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
+
+```sh
+spine update --dry-run --json
+# changes, diff, base_hash를 검토한 뒤 적용합니다.
+spine update --if-match <base_hash> --json
+```
 
 새 리소스의 생성 계획도 같은 방식으로 확인할 수 있습니다.
 
@@ -268,13 +278,16 @@ DB 연결이나 마이그레이션 없이 다음 검사를 실행합니다.
 
 ```sh
 spine context --root . --json
-spine contract check --root . --json
-spine verify --root . --json
+spine contract check --root . --warnings-as-errors --json
+spine verify --root . --warnings-as-errors --json
+spine build --root .
 spine contract probe --root . --json
 ```
 
-기존 DisableRecover 설정은 HTTP_RECOVERY_DISABLED 경고로 표시되며, --warnings-as-errors를
-붙이면 실패합니다. 테스트 라우트는 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1일 때만 계약과 앱에
+`./scripts/check.sh`는 위 검사와 CLI 빌드, race 검사를 함께 실행합니다.
+다른 위치의 CLI를 사용하려면 `SPINE_CLI_BIN=/경로/spine ./scripts/check.sh`로 지정합니다.
+
+HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1일 때만 계약과 앱에
 포함됩니다. CLI 검사와 서버 실행에 같은 환경변수를 전달해야 합니다. 부분 probe는 DB 연결이나
 실제 HTTP, 인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
 
@@ -344,12 +357,19 @@ E2E는 다음 경계를 실제 MySQL 행 수로 확인합니다.
 - 중복 이메일 `409` 후 기존 행 유지
 - 컨트롤러가 오류를 반환한 뒤 삽입 행 롤백
 - 잘못된 응답 쿠키 때문에 응답 준비가 실패한 뒤 삽입 행 롤백
+- 선택적 보호 라우트의 인증 실패 시 사용자 행이 추가되지 않음
+- 인증되지 않은 잘못된 본문은 바인딩 전에 거부되고, 유효한 인증의 잘못된 본문은 400으로 처리됨
 
-마지막 두 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다. 직접 외부 인프라에 연결해 테스트하려면 다음 환경 변수를 지정합니다.
+컨트롤러·응답 오류 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다.
+
+보안 검증용 `POST /scenarios/security/users`는 `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1`과 비어 있지 않은 `SPINE_DEMO_SECURITY_TOKEN`을 함께 지정해야 등록됩니다. `Authorization: Bearer <토큰>`을 검사하고, 본문 처리는 인증 성공 후에 진행합니다. 이 토큰은 테스트용 공유 자격 증명이며 사용자별 인증·인가 예제는 아닙니다. 기존 `/users` 경로에는 이 인증이 적용되지 않습니다. E2E 스크립트는 격리된 로컬 실행에만 사용할 임시 테스트 토큰을 설정합니다.
+
+`internal/interceptor`의 HTTP 파이프라인 테스트는 인증 실패와 잘못된 본문에서 컨트롤러 미실행, 작은 본문 제한의 적용, 동시 요청의 컨텍스트 격리를 검사합니다. 해당 테스트는 MySQL 없이 Spine과 Echo 플랫폼의 `Prepare` 경로를 사용합니다. 직접 외부 인프라에 연결해 E2E를 실행할 때는 서버에도 보안 시나리오 활성화 변수와 토큰을 지정한 뒤 다음 환경 변수를 사용합니다.
 
 ```sh
 SPINE_DEMO_MYSQL_DSN='root:spine@tcp(127.0.0.1:13307)/spine_demo?parseTime=true&loc=Local' \
 SPINE_DEMO_E2E_BASE_URL='http://127.0.0.1:18080' \
+SPINE_DEMO_E2E_SECURITY_TOKEN='<서버에 설정한 테스트 토큰>' \
 go test -tags=e2e -v ./e2e
 ```
 
