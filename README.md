@@ -6,6 +6,16 @@ Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 C
 Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
 새로운 Spine 프로젝트를 만들거나 이 예제를 확장하려면 [Spine CLI의 명령과 사용 예제](https://github.com/NARUBROWN/spine-cli#readme)를 확인하세요.
 
+## 예제 채널 선택
+
+| 채널 | 브랜치 | 용도 |
+| --- | --- | --- |
+| Preview | [`preview`](https://github.com/NARUBROWN/spine-user-demo/tree/preview) | 개발 중인 변경과 실험 버전을 확인합니다. |
+| RC | [`rc`](https://github.com/NARUBROWN/spine-user-demo/tree/rc) | 정식 공개 전 릴리스 후보를 확인합니다. |
+| Stable | [`main`](https://github.com/NARUBROWN/spine-user-demo/tree/main) | 정식 의존성을 사용하는 공개 예제이며 기본 브랜치입니다. |
+
+예제 코드는 `preview → rc → main` 순서로 승격합니다. 예제 태그는 `vX.Y.Z-preview.N`, `vX.Y.Z-rc.N`, `vX.Y.Z`로 구분하며, **GitHub Release는 Stable에서만 발행합니다.** 실제 Spine 버전은 선택한 브랜치의 `go.mod`를 확인하세요. [채널 검사와 발행 절차](RELEASE_CHANNELS.md)를 참고하세요.
+
 ## Spine CLI로 실행하기
 
 Go와 Spine CLI를 설치하고 [MySQL 연결 설정과 최초 마이그레이션](#실행-방법)을 마쳤다면,

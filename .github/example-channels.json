@@ -1,0 +1,8 @@
+{
+  "schema_version": "spine.example-channels/v1",
+  "cli_version": "v0.4.2",
+  "modules": [
+    "."
+  ],
+  "application_ci": false
+}

@@ -1,0 +1,38 @@
+name: Example Channels
+run-name: Example channel / ${{ github.base_ref || github.ref_name }}
+
+on:
+  push:
+    branches: [preview, rc, main]
+  pull_request:
+    branches: [preview, rc, main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: example-channels-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  channel:
+    name: Example Channel / ${{ github.base_ref || github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: false
+      - name: Check dependency channel
+        env:
+          TARGET_CHANNEL: ${{ github.base_ref || github.ref_name }}
+        run: python3 scripts/release/example_channels.py --channel "$TARGET_CHANNEL"
+      - name: Check channel policy regressions
+        run: |
+          node --test scripts/release/branch_flow.test.cjs
+          python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
