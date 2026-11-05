@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// UserQuery는 사용자 ID를 쿼리 문자열에서 받습니다.
+type UserQuery struct {
+	ID *int64 `query:"id"`
+}
+
+// UserID는 누락된 ID를 0으로 처리합니다.
+func (q *UserQuery) UserID() int {
+	if q == nil || q.ID == nil {
+		return 0
+	}
+	return int(*q.ID)
+}
+
 type CreateUserRequest struct {
 	ID    int    `json:"id"`
 	Name  string `json:"name"`

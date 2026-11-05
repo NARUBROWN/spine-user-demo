@@ -41,7 +41,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 예제는 Spine `v0.6.5`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 Preview 예제는 Spine `v0.7.0-preview.2`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -72,26 +72,33 @@ func NewUserService(repo *repository.UserRepository) *UserService {
 
 핵심 특징:
 - 컨테이너에 등록될 컴포넌트는 **생성자 함수**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다.
-- Controller는 `context.Context`, `query.Values`, DTO를 조합해 입력을 받습니다.
-- Query는 `query.Values`로 **가변 파라미터**를 받고, 필요 시 직접 해석할 수 있습니다.
+- Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
+- `UserQuery`의 `query:"id"` 필드로 쿼리 ID를 받고, 누락과 양수 여부는 핸들러에서 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
 
 예시:
 ```go
+type UserQuery struct {
+    ID *int64 `query:"id"`
+}
+
 func (c *UserController) GetUser(
     ctx context.Context,
-    q query.Values,
+    q *dto.UserQuery,
 ) (httpx.Response[dto.CreateUserResponse], error) {
-    userId := int(q.Int("id", 0))
-
+    userId := q.UserID()
+    if userId <= 0 {
+        return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
+    }
     user, err := c.userService.Get(ctx, userId)
     if err != nil {
-        return httpx.Response[dto.CreateUserResponse]{}, httperr.NotFound("유저를 찾을 수 없습니다.")
+        return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
     }
-
     return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
 }
 ```
+
+숫자 변환에 실패하거나 범위를 넘는 ID는 바인딩 단계에서 HTTP 400으로 거부됩니다. 같은 `id`를 여러 번 전달하는 요청도 HTTP 400으로 거부합니다. 이전 `query.Values`는 첫 번째 값만 사용했습니다.
 
 DTO 예시:
 ```go
@@ -223,16 +230,17 @@ app.InterceptorFor(
 
 ## Spine CLI 프로젝트 구조
 
-공개 Spine CLI `v0.4.2`의 플랫폼 조립 방식과 Spine `v0.6.5`에 맞춰 기존 API와 처리 로직을 구성했습니다.
-Go `1.25.5` 이상에서 다음 명령으로 같은 CLI를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
+공개 Spine CLI Preview의 플랫폼 조립 방식과 Spine `v0.7.0-preview.2`에 맞춰 기존 API와 처리 로직을 구성했습니다.
+Go `1.25.5` 이상에서 다음 명령으로 CLI Preview를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.2
+go install github.com/NARUBROWN/spine-cli/cmd/spine@preview
 spine version
-# spine-cli 0.4.2
 ```
 
-HTTP 앱은 Spine `v0.6.5`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합니다.
+`@preview`는 설치 시점의 CLI Preview 브랜치를 사용합니다. CI 검증 버전은 `.github/example-channels.json`에 고정합니다.
+
+HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
 `spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
@@ -264,7 +272,7 @@ HTTP 앱은 Spine `v0.6.5`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합�
 `spine.New(echoplatform.Option(echoplatform.WithEcho(...)))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
-`spine.toml`에는 `recipe = "platform-contracts-v0.6.5"`, `websocket_platform = "none"`,
+`spine.toml`에는 `recipe = "platform-contracts-v0.7.0-preview.2"`, `websocket_platform = "none"`,
 `validator = "none"`을 기록합니다. 기존 DTO 검증과 HTTP 오류 처리를 유지하며 별도 검증기는 선택하지 않습니다.
 `spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
 

@@ -10,7 +10,6 @@ import (
 	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine/pkg/httperr"
-	"github.com/NARUBROWN/spine/pkg/query"
 	"github.com/uptrace/bun"
 )
 
@@ -38,13 +37,13 @@ func (emptyCtx) Get(string) (any, bool) { return nil, false }
 
 func TestGetUserRejectsInvalidID(t *testing.T) {
 	controller := &UserController{userService: &fakeUserService{}}
-	_, err := controller.GetUser(context.Background(), query.Values{})
+	_, err := controller.GetUser(context.Background(), &dto.UserQuery{})
 	assertHTTPStatus(t, err, http.StatusBadRequest)
 }
 
 func TestGetUserMapsNotFound(t *testing.T) {
 	controller := &UserController{userService: &fakeUserService{getErr: service.ErrUserNotFound}}
-	_, err := controller.GetUser(context.Background(), query.NewValues(map[string][]string{"id": {"123"}}))
+	_, err := controller.GetUser(context.Background(), &dto.UserQuery{ID: idPtr(123)})
 	assertHTTPStatus(t, err, http.StatusNotFound)
 }
 
@@ -68,3 +67,5 @@ func assertHTTPStatus(t *testing.T, err error, want int) {
 		t.Fatalf("status = %d, want %d", httpErr.Status, want)
 	}
 }
+
+func idPtr(id int64) *int64 { return &id }
