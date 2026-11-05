@@ -1,0 +1,49 @@
+name: Publish Example
+run-name: Example ${{ inputs.version }} from ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '예: v0.6.6-preview.1, v0.6.6-rc.1, v0.6.6'
+        required: true
+        type: string
+      source_sha:
+        description: 발행할 브랜치 HEAD의 전체 40자리 SHA
+        required: true
+        type: string
+      source_tag:
+        description: 이전 단계 태그. Preview는 빈칸, RC는 Preview, Stable은 RC 태그 지정
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+  checks: read
+
+concurrency:
+  group: example-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref_type == 'branch' && contains(fromJSON('["preview", "rc", "main"]'), github.ref_name)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: false
+      - name: Publish verified example
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXAMPLE_VERSION: ${{ inputs.version }}
+          EXAMPLE_SOURCE_SHA: ${{ inputs.source_sha }}
+          EXAMPLE_SOURCE_TAG: ${{ inputs.source_tag }}
+        run: python3 scripts/release/publish.py --version "$EXAMPLE_VERSION" --sha "$EXAMPLE_SOURCE_SHA" --source "$EXAMPLE_SOURCE_TAG"
