@@ -22,7 +22,7 @@ Go와 Spine CLI를 설치하고 [MySQL 연결 설정과 최초 마이그레이�
 이 저장소 루트에서 다음 명령으로 개발 서버를 실행할 수 있습니다.
 
 ```sh
-spine-cli dev
+spine dev
 ```
 
 서버는 기본적으로 `http://localhost:8080`에서 실행됩니다. 코드를 수정하면 CLI가 변경을 감지해
@@ -30,8 +30,8 @@ spine-cli dev
 개발 서버를 실행 중인 터미널과 별도로, 다음 명령으로 실행 파일을 빌드하거나 계약과 코드를 검증할 수 있습니다.
 
 ```sh
-spine-cli build
-spine-cli verify
+spine build
+spine verify
 ```
 
 ## 둘러보기
@@ -41,7 +41,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 Preview 예제는 Spine `v0.7.0-preview.1`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 Preview 예제는 Spine `v0.7.0-preview.2`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -230,21 +230,22 @@ app.InterceptorFor(
 
 ## Spine CLI 프로젝트 구조
 
-공개 Spine CLI `v0.4.3-preview.2`의 플랫폼 조립 방식과 Spine `v0.7.0-preview.1`에 맞춰 기존 API와 처리 로직을 구성했습니다.
-Go `1.25.5` 이상에서 다음 명령으로 같은 CLI를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
+공개 Spine CLI Preview의 플랫폼 조립 방식과 Spine `v0.7.0-preview.2`에 맞춰 기존 API와 처리 로직을 구성했습니다.
+Go `1.25.5` 이상에서 다음 명령으로 CLI Preview를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli@v0.4.3-preview.2
-spine-cli version
-# spine-cli 0.4.3-preview.2
+go install github.com/NARUBROWN/spine-cli/cmd/spine@preview
+spine version
 ```
 
-HTTP 앱은 Spine `v0.7.0-preview.1`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v5.4.4`를 사용합니다.
+`@preview`는 설치 시점의 CLI Preview 브랜치를 사용합니다. CI 검증 버전은 `.github/example-channels.json`에 고정합니다.
+
+HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
-`spine-cli new`의 기본 `layered-v1` 구조를 사용합니다. `spine-cli g resource user`와 DTO 생성기로
+`spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
 만든 뼈대에 기존 Bun CRUD, 검증, 오류 매핑과 트랜잭션 처리를 옮겼습니다.
-`spine-cli g route`로 기존 HTTP 메서드와 경로를 명시적으로 등록했습니다.
+`spine g route`로 기존 HTTP 메서드와 경로를 명시적으로 등록했습니다.
 
 ```text
 .
@@ -271,20 +272,20 @@ HTTP 앱은 Spine `v0.7.0-preview.1`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v
 `spine.New(echoplatform.Option(echoplatform.WithEcho(...)))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
-`spine.toml`에는 `recipe = "platform-contracts-v0.7.0-preview.1"`, `websocket_platform = "none"`,
+`spine.toml`에는 `recipe = "platform-contracts-v0.7.0-preview.2"`, `websocket_platform = "none"`,
 `validator = "none"`을 기록합니다. 기존 DTO 검증과 HTTP 오류 처리를 유지하며 별도 검증기는 선택하지 않습니다.
-`spine-cli update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
+`spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
 
 ```sh
-spine-cli update --dry-run --json
+spine update --dry-run --json
 # changes, diff, base_hash를 검토한 뒤 적용합니다.
-spine-cli update --if-match <base_hash> --json
+spine update --if-match <base_hash> --json
 ```
 
 새 리소스의 생성 계획도 같은 방식으로 확인할 수 있습니다.
 
 ```sh
-spine-cli g resource product --dry-run --json
+spine g resource product --dry-run --json
 ```
 
 출력의 `changes`, `diff`, `base_hash`를 확인한 뒤 같은 명령에 `--if-match <base_hash>`를
@@ -294,15 +295,15 @@ spine-cli g resource product --dry-run --json
 DB 연결이나 마이그레이션 없이 다음 검사를 실행합니다.
 
 ```sh
-spine-cli context --root . --json
-spine-cli contract check --root . --warnings-as-errors --json
-spine-cli verify --root . --warnings-as-errors --json
-spine-cli build --root .
-spine-cli contract probe --root . --json
+spine context --root . --json
+spine contract check --root . --warnings-as-errors --json
+spine verify --root . --warnings-as-errors --json
+spine build --root .
+spine contract probe --root . --json
 ```
 
 `./scripts/check.sh`는 위 검사와 CLI 빌드, race 검사를 함께 실행합니다.
-다른 위치의 CLI를 사용하려면 `SPINE_CLI_BIN=/경로/spine-cli ./scripts/check.sh`로 지정합니다.
+다른 위치의 CLI를 사용하려면 `SPINE_CLI_BIN=/경로/spine ./scripts/check.sh`로 지정합니다.
 
 HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1일 때만 계약과 앱에
 포함됩니다. CLI 검사와 서버 실행에 같은 환경변수를 전달해야 합니다. 부분 probe는 DB 연결이나
@@ -323,8 +324,8 @@ HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEM
    ```
 4. CLI로 서버 실행
    ```sh
-   spine-cli dev
-   # 또는 spine-cli run / go run .
+   spine dev
+   # 또는 spine run / go run .
    ```
 5. 서버 주소: `http://localhost:8080`
 6. Swagger UI: `http://localhost:8080/swagger/index.html`

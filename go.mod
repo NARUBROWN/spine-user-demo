@@ -3,7 +3,7 @@ module spine-user-demo
 go 1.25.5
 
 require (
-	github.com/NARUBROWN/spine v0.7.0-preview.1
+	github.com/NARUBROWN/spine v0.7.0-preview.2
 	github.com/NARUBROWN/spine-echo-platform v0.2.0-preview.1
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/labstack/echo/v5 v5.4.4
