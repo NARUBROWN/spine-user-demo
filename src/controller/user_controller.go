@@ -10,7 +10,6 @@ import (
 
 	"github.com/NARUBROWN/spine/pkg/httperr"
 	"github.com/NARUBROWN/spine/pkg/httpx"
-	"github.com/NARUBROWN/spine/pkg/query"
 	"github.com/NARUBROWN/spine/pkg/spine"
 	"github.com/uptrace/bun"
 )
@@ -41,9 +40,9 @@ func NewUserController(userService *service.UserService) *UserController {
 // @Router /users [get]
 func (c *UserController) GetUser(
 	ctx context.Context,
-	q query.Values,
+	q *dto.UserQuery,
 ) (httpx.Response[dto.CreateUserResponse], error) {
-	userId := int(q.Int("id", 0))
+	userId := q.UserID()
 	if userId <= 0 {
 		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
 	}
@@ -100,14 +99,14 @@ func (c *UserController) CreateUser(
 // @Router /users [put]
 func (c *UserController) UpdateUser(
 	ctx context.Context,
-	q query.Values,
+	q *dto.UserQuery,
 	req *dto.UpdateUserRequest,
 	spineCtx spine.Ctx,
 ) (httpx.Response[dto.CreateUserResponse], error) {
 	if err := req.Validate(); err != nil {
 		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest(err.Error())
 	}
-	userId := int(q.Int("id", 0))
+	userId := q.UserID()
 	if userId <= 0 {
 		return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
 	}
@@ -137,10 +136,10 @@ func (c *UserController) UpdateUser(
 // @Router /users [delete]
 func (c *UserController) DeleteUser(
 	ctx context.Context,
-	q query.Values,
+	q *dto.UserQuery,
 	spineCtx spine.Ctx,
 ) error {
-	userId := int(q.Int("id", 0))
+	userId := q.UserID()
 	if userId <= 0 {
 		return httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
 	}

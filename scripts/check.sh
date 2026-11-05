@@ -2,7 +2,7 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-spine_cli="${SPINE_CLI_BIN:-spine}"
+spine_cli="${SPINE_CLI_BIN:-spine-cli}"
 cd "${project_dir}"
 
 "${spine_cli}" context --json

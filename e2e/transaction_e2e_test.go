@@ -60,6 +60,13 @@ func TestHTTPContractsAndTransactionBoundaries(t *testing.T) {
 		assertStatus(t, status, http.StatusBadRequest)
 	})
 
+	for _, query := range []string{"", "?id=0", "?id=-1", "?id=abc", "?id=9223372036854775808"} {
+		t.Run("invalid user ID "+query, func(t *testing.T) {
+			status, _ := requestJSON(t, http.MethodGet, baseURL+"/users"+query, "")
+			assertStatus(t, status, http.StatusBadRequest)
+		})
+	}
+
 	t.Run("missing user returns 404", func(t *testing.T) {
 		response, err := http.Get(baseURL + "/users?id=2147483647")
 		if err != nil {
@@ -85,6 +92,15 @@ func TestHTTPContractsAndTransactionBoundaries(t *testing.T) {
 		status, _ := postJSON(t, baseURL+"/scenarios/transactions/response-error", userJSON("Alice", responseErrorEmail))
 		assertStatus(t, status, http.StatusInternalServerError)
 		assertUserCount(t, db, responseErrorEmail, 0)
+	})
+
+	t.Run("duplicate ID query is rejected", func(t *testing.T) {
+		if createdUser.ID <= 0 {
+			t.Fatal("successful creation is required")
+		}
+		endpoint := fmt.Sprintf("%s/users?id=%d&id=999", baseURL, createdUser.ID)
+		status, _ := requestJSON(t, http.MethodGet, endpoint, "")
+		assertStatus(t, status, http.StatusBadRequest)
 	})
 
 	t.Run("read update and delete preserve the CRUD contract", func(t *testing.T) {
