@@ -8,7 +8,7 @@ import (
 
 // UserQuery는 사용자 ID를 쿼리 문자열에서 받습니다.
 type UserQuery struct {
-	ID *int64 `query:"id"`
+	ID *int64
 }
 
 // UserID는 누락된 ID를 0으로 처리합니다.

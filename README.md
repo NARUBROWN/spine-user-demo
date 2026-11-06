@@ -392,3 +392,13 @@ go test -tags=e2e -v ./e2e
 ```
 
 스크립트는 종료할 때 테스트 서버와 MySQL 컨테이너 및 볼륨을 정리합니다. 별도 포트가 필요하면 `SPINE_DEMO_E2E_MYSQL_PORT`와 `SPINE_DEMO_E2E_HTTP_PORT`를 설정할 수 있습니다.
+
+## 컨트롤러 경로 등록 후보
+
+이 소스는 코어 v0.7.0-preview.5 후보의 `api.Controller.RegisterRoutes`를 사용합니다. 공개 코어 태그가 준비되기 전에는 짝이 맞는 로컬 소스 조합에서 검증합니다. 기본 User 앱과 기존 DB를 자동으로 이전하거나 재기동하지 않습니다.
+
+`src/controller/user_controller.go`가 CRUD 경로와 콜백을 함께 선언하고 `internal/application`은 구체 생성자를 등록합니다. 별도 src/route/route.go는 사용하지 않습니다. Query와 Body는 `input.Query[dto.UserQuery]`, `input.Body[dto.CreateUserRequest]` 등으로 받으며 기존 DTO 정규화와 검증, 트랜잭션, 오류 응답 및 선택적 실패와 보안 시나리오를 유지합니다.
+
+준비 전 `spine.DescribeHTTP`는 생성자를 실행하지 않고 ErrRoutesNotCollected를 반환합니다. CLI 정적 내보내기를 사용하거나, 앱을 명시적으로 Prepare한 뒤 DescribePreparedHTTP를 조회하세요. DB와 브로커 초기화는 명시한 준비 과정의 일부입니다.
+
+기존 Swagger UI와 추적 중인 Swagger 스냅샷은 유지합니다. Swaggo의 메서드 주석 수집이 익명 콜백을 자동으로 해석한다고 가정하지 않습니다. 새 코드의 경로와 요청 타입 변경은 `spine contract export --format openapi --source static --output openapi.json`으로 확인하세요. 수동 Validate의 업무 규칙과 동적 상태 코드는 자동 추론하지 않습니다.

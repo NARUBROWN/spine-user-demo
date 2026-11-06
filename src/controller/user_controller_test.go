@@ -3,7 +3,12 @@ package controller
 import (
 	"context"
 	"errors"
+	"github.com/NARUBROWN/spine"
+	platform "github.com/NARUBROWN/spine-echo-platform"
+	"github.com/NARUBROWN/spine/pkg/boot"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"spine-user-demo/src/dto"
@@ -37,20 +42,17 @@ func (emptyCtx) Get(string) (any, bool) { return nil, false }
 
 func TestGetUserRejectsInvalidID(t *testing.T) {
 	controller := &UserController{userService: &fakeUserService{}}
-	_, err := controller.GetUser(context.Background(), &dto.UserQuery{})
-	assertHTTPStatus(t, err, http.StatusBadRequest)
+	assertControllerHTTP(t, controller, "GET", "/users", "", http.StatusBadRequest)
 }
 
 func TestGetUserMapsNotFound(t *testing.T) {
 	controller := &UserController{userService: &fakeUserService{getErr: service.ErrUserNotFound}}
-	_, err := controller.GetUser(context.Background(), &dto.UserQuery{ID: idPtr(123)})
-	assertHTTPStatus(t, err, http.StatusNotFound)
+	assertControllerHTTP(t, controller, "GET", "/users?id=123", "", http.StatusNotFound)
 }
 
 func TestCreateUserValidatesBeforeTransactionLookup(t *testing.T) {
 	controller := &UserController{userService: &fakeUserService{}}
-	_, err := controller.CreateUser(context.Background(), &dto.CreateUserRequest{}, emptyCtx{})
-	assertHTTPStatus(t, err, http.StatusBadRequest)
+	assertControllerHTTP(t, controller, "POST", "/users", `{}`, http.StatusBadRequest)
 }
 
 func TestMapServiceErrorMapsDuplicateEmail(t *testing.T) {
@@ -69,3 +71,25 @@ func assertHTTPStatus(t *testing.T, err error, want int) {
 }
 
 func idPtr(id int64) *int64 { return &id }
+
+func assertControllerHTTP(t *testing.T, controller *UserController, method, path, body string, want int) {
+	t.Helper()
+	app := platform.New()
+	app.Constructor(func() *UserController { return controller })
+	prepared, err := app.Prepare(t.Context(), boot.Options{HTTP: &boot.HTTPOptions{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer prepared.Close(context.Background())
+	handler, err := spine.NetHTTPHandler(prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != want {
+		t.Fatalf("status=%d want=%d body=%s", response.Code, want, response.Body.String())
+	}
+}

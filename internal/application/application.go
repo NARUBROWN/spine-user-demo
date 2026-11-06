@@ -8,7 +8,6 @@ import (
 	"spine-user-demo/internal/interceptor"
 	"spine-user-demo/src/controller"
 	"spine-user-demo/src/repository"
-	"spine-user-demo/src/route"
 	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine"
@@ -22,6 +21,9 @@ import (
 
 // BuildApplication은 서버와 CLI가 공유하는 구성 진입점이며 DB 연결이나 리스너를 시작하지 않습니다.
 func BuildApplication() (spine.App, boot.Options, error) {
+	if err := controller.ValidateEnvironment(); err != nil {
+		return nil, boot.Options{}, err
+	}
 	app := spine.New(echoplatform.Option(echoplatform.WithEcho(func(e *echo.Echo) {
 		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
 	})))
@@ -42,9 +44,6 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		(*interceptor.TxInterceptor)(nil),
 		&interceptor.LoggingInterceptor{},
 	)
-	if err := route.Register(app); err != nil {
-		return nil, boot.Options{}, err
-	}
 
 	address := os.Getenv("SPINE_DEMO_ADDRESS")
 	if address == "" {
