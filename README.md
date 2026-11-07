@@ -438,3 +438,7 @@ spine contract export --format openapi --source static --output openapi.json
 ```
 
 수동 `Validate`의 업무 규칙과 동적 상태 코드, 인증 정책을 자동 추론하지 않습니다. 내장 UI로 바꾸기 위해 문서 전용 검증기를 추가하지 않습니다.
+
+## 컨트롤러 DX의 Preview 후보 조합
+
+코어 `v0.7.0-preview.5`, CLI `v0.4.3-preview.5`와 함께 사용하는 소스 후보입니다. `spine.toml`의 `platform-contracts-preview` 레시피는 Preview 브랜치 조회를 선택하며 실제 고정 의존성은 `go.mod`를 따릅니다. 아직 공개되지 않은 후보를 설치 완료로 해석하지 않습니다. User 예제에는 별도의 공개 버전 태그를 만들지 않으며 코어와 CLI의 공개 설치 및 원격 CI 검증은 발행 단계에서 수행합니다.
