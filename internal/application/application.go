@@ -14,6 +14,7 @@ import (
 	echoplatform "github.com/NARUBROWN/spine-echo-platform"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	"github.com/NARUBROWN/spine/pkg/boot"
+	"github.com/NARUBROWN/spine/pkg/constructor"
 	"github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui"
 )
 
@@ -23,11 +24,13 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		return nil, boot.Options{}, err
 	}
 	app := spine.New(echoplatform.Option())
-	app.Constructor(database.NewBunDB)
-	app.RepositoryConstructor(&repository.UserRepository{})
-	app.ServiceConstructor(&service.UserService{})
-	app.ControllerConstructor(&controller.UserController{})
-	app.InterceptorConstructor(&interceptor.TxInterceptor{})
+	app.Constructor(
+		constructor.Custom(database.NewBunDB),
+		constructor.Repository(&repository.UserRepository{}),
+		constructor.Service(&service.UserService{}),
+		constructor.Controller(&controller.UserController{}),
+		constructor.Interceptor(&interceptor.TxInterceptor{}),
+	)
 	app.InterceptorFor(
 		boot.InterceptorHTTP,
 		cors.New(cors.Config{

@@ -51,14 +51,16 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 - HTTP 범위 인터셉터가 요청 ID와 처리 시간을 영문 로그로 남깁니다. 유효한 `X-Request-ID`가 있으면 이어서 사용합니다.
 - 성공 응답은 커밋하고 컨트롤러 오류와 응답 준비 오류는 롤백하는 경계를 Docker E2E로 검증합니다.
 
-역할별 등록은 같은 DI 컨테이너를 공유합니다. `ControllerConstructor`는 생성 메서드와 `RegisterRoutes`를, `InterceptorConstructor`는 생성 메서드와 기존 인터셉터 계약을 검사합니다. 인터셉터 적용은 기존 `InterceptorFor`로 지정합니다. 이 API는 미공개 코어 후보 소스에서 검증했습니다.
+`constructor`는 `github.com/NARUBROWN/spine/pkg/constructor` 패키지입니다. 사용자 정의를 포함한 다섯 역할을 하나의 `app.Constructor(...)` 호출에 모으며 같은 DI 컨테이너를 공유합니다. `constructor.Controller`는 생성 메서드와 `RegisterRoutes`를, `constructor.Interceptor`는 생성 메서드와 기존 인터셉터 계약을 검사합니다. 인터셉터 적용은 기존 `InterceptorFor`로 지정합니다. 이 API는 미공개 코어 후보 소스에서 검증했습니다.
 
 ```go
-app.Constructor(database.NewBunDB)
-app.RepositoryConstructor(&repository.UserRepository{})
-app.ServiceConstructor(&service.UserService{})
-app.ControllerConstructor(&controller.UserController{})
-app.InterceptorConstructor(&interceptor.TxInterceptor{})
+app.Constructor(
+    constructor.Custom(database.NewBunDB),
+    constructor.Repository(&repository.UserRepository{}),
+    constructor.Service(&service.UserService{}),
+    constructor.Controller(&controller.UserController{}),
+    constructor.Interceptor(&interceptor.TxInterceptor{}),
+)
 ```
 
 생성자 의존성 예시 (Repository -> Service):
@@ -81,7 +83,7 @@ func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
 ```
 
 핵심 특징:
-- 컨테이너에 등록될 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다.
+- 객체 표식으로 등록하는 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다. 외부 타입의 기존 생성자 함수는 `constructor.Custom(NewX)`로 등록할 수 있습니다.
 - Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
 - `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 누락과 양수 여부는 핸들러에서 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
