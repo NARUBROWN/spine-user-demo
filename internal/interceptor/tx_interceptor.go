@@ -11,7 +11,7 @@ type TxInterceptor struct {
 	db *bun.DB
 }
 
-func NewTxInterceptor(db *bun.DB) *TxInterceptor {
+func (*TxInterceptor) Constructor(db *bun.DB) *TxInterceptor {
 	return &TxInterceptor{db: db}
 }
 

@@ -31,11 +31,9 @@ type userService interface {
 	Delete(context.Context, bun.IDB, int) error
 }
 
-func NewUserController(userService *service.UserService) *UserController {
+func (*UserController) Constructor(userService *service.UserService) *UserController {
 	return &UserController{userService: userService}
 }
-
-var _ api.Controller = (*UserController)(nil)
 
 // RegisterRoutes는 경로와 요청 처리 코드를 함께 등록합니다.
 func (c *UserController) RegisterRoutes(r *api.Registry) {

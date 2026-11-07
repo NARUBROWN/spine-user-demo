@@ -27,13 +27,11 @@ func BuildApplication() (spine.App, boot.Options, error) {
 	app := spine.New(echoplatform.Option(echoplatform.WithEcho(func(e *echo.Echo) {
 		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
 	})))
-	app.Constructor(
-		database.NewBunDB,
-		repository.NewUserRepository,
-		service.NewUserService,
-		controller.NewUserController,
-		interceptor.NewTxInterceptor,
-	)
+	app.Constructor(database.NewBunDB)
+	app.RepositoryConstructor(&repository.UserRepository{})
+	app.ServiceConstructor(&service.UserService{})
+	app.ControllerConstructor(&controller.UserController{})
+	app.InterceptorConstructor(&interceptor.TxInterceptor{})
 	app.InterceptorFor(
 		boot.InterceptorHTTP,
 		cors.New(cors.Config{

@@ -41,7 +41,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 Preview 예제는 Spine `v0.7.0-preview.2`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 Preview 소스 예제는 Spine `v0.7.0-preview.5` 후보의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -51,13 +51,23 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 - HTTP 범위 인터셉터가 요청 ID와 처리 시간을 영문 로그로 남깁니다. 유효한 `X-Request-ID`가 있으면 이어서 사용합니다.
 - 성공 응답은 커밋하고 컨트롤러 오류와 응답 준비 오류는 롤백하는 경계를 Docker E2E로 검증합니다.
 
+역할별 등록은 같은 DI 컨테이너를 공유합니다. `ControllerConstructor`는 생성 메서드와 `RegisterRoutes`를, `InterceptorConstructor`는 생성 메서드와 기존 인터셉터 계약을 검사합니다. 인터셉터 적용은 기존 `InterceptorFor`로 지정합니다. 이 API는 미공개 코어 후보 소스에서 검증했습니다.
+
+```go
+app.Constructor(database.NewBunDB)
+app.RepositoryConstructor(&repository.UserRepository{})
+app.ServiceConstructor(&service.UserService{})
+app.ControllerConstructor(&controller.UserController{})
+app.InterceptorConstructor(&interceptor.TxInterceptor{})
+```
+
 생성자 의존성 예시 (Repository -> Service):
 ```go
 type UserRepository struct {
     db bun.IDB
 }
 
-func NewUserRepository(db *bun.DB) *UserRepository {
+func (*UserRepository) Constructor(db *bun.DB) *UserRepository {
     return &UserRepository{db: db}
 }
 
@@ -65,36 +75,33 @@ type UserService struct {
     repo userRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
     return &UserService{repo: repo}
 }
 ```
 
 핵심 특징:
-- 컨테이너에 등록될 컴포넌트는 **생성자 함수**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다.
+- 컨테이너에 등록될 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다.
 - Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
-- `UserQuery`의 `query:"id"` 필드로 쿼리 ID를 받고, 누락과 양수 여부는 핸들러에서 검사합니다.
+- `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 누락과 양수 여부는 핸들러에서 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
 
 예시:
 ```go
-type UserQuery struct {
-    ID *int64 `query:"id"`
-}
+type UserQuery struct { ID *int64 }
 
-func (c *UserController) GetUser(
-    ctx context.Context,
-    q *dto.UserQuery,
-) (httpx.Response[dto.CreateUserResponse], error) {
-    userId := q.UserID()
-    if userId <= 0 {
-        return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
-    }
-    user, err := c.userService.Get(ctx, userId)
-    if err != nil {
-        return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
-    }
-    return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
+func (c *UserController) RegisterRoutes(r *api.Registry) {
+    r.GET("/users", func(ctx context.Context, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
+        userId := (*q).UserID()
+        if userId <= 0 {
+            return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
+        }
+        user, err := c.userService.Get(ctx, userId)
+        if err != nil {
+            return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
+        }
+        return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
+    })
 }
 ```
 
