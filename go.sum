@@ -1,11 +1,11 @@
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
-github.com/NARUBROWN/spine v0.7.0-preview.6 h1:lgAWAaR+5mWtdKHE4rj3PgbJntz8xcKexqPM7tqZhFA=
-github.com/NARUBROWN/spine v0.7.0-preview.6/go.mod h1:A0JJcUelvcyn3DW+VkSTHJfvKBegrMNKfXCq8tbiXJ4=
+github.com/NARUBROWN/spine v0.7.0-preview.7 h1:d1iWyJpgh9OaQM0uwn+vo1IVV4dLOOe+FmTpKCcGmTY=
+github.com/NARUBROWN/spine v0.7.0-preview.7/go.mod h1:A0JJcUelvcyn3DW+VkSTHJfvKBegrMNKfXCq8tbiXJ4=
 github.com/NARUBROWN/spine-echo-platform v0.2.0-preview.3 h1:cKsrEPPlRZs0SqBwzzLHqoldLY/jBhZzSRQJzmPYPT4=
 github.com/NARUBROWN/spine-echo-platform v0.2.0-preview.3/go.mod h1:/vN8upRFYTCcPfXJfw/B+kNPBeZ8Uf/VLazVm19HqCU=
-github.com/NARUBROWN/spine-validator-playground v0.2.0-preview.5 h1:n/EWbSkNfNx8YxGgZXfbe6aSD2iZnYRrxZr3ejJtdLI=
-github.com/NARUBROWN/spine-validator-playground v0.2.0-preview.5/go.mod h1:ze0ikOikDXSWmnC0f0Q44AGkosRpQI/nRcnSWA4Th1Q=
+github.com/NARUBROWN/spine-validator-playground v0.2.0-preview.6 h1:+XVXdnwaKBHDTQ84rpDu45aDUBTYb9aFCe504wYSpIw=
+github.com/NARUBROWN/spine-validator-playground v0.2.0-preview.6/go.mod h1:yYY/fxm6/q/XKcK9JVpujNm2nCv3hWKLpPAB0vF/I7g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gabriel-vasile/mimetype v1.4.16 h1:5izNFuvA37st1dDRAcA7TtmngBmRgiIPDmTtiEvjx1E=
