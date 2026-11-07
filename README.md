@@ -85,12 +85,12 @@ func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
 핵심 특징:
 - 객체 표식으로 등록하는 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다. 외부 타입의 기존 생성자 함수는 `constructor.Custom(NewX)`로 등록할 수 있습니다.
 - Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
-- `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 누락과 양수 여부는 핸들러에서 검사합니다.
+- `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 playground가 필수값과 양수 여부를 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
 
 예시:
 ```go
-type UserQuery struct { ID *int64 }
+type UserQuery struct { ID *int64 `validate:"required,gt=0"` }
 
 func (c *UserController) RegisterRoutes(r *api.Registry) {
     r.GET("/users", func(ctx context.Context, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
@@ -113,12 +113,12 @@ DTO 예시:
 ```go
 type CreateUserRequest struct {
     ID    int    `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    Name  string `json:"name" validate:"required,max=100"`
+    Email string `json:"email" validate:"required,email,max=255"`
 }
 
 type UpdateUserRequest struct {
-    Name  string `json:"name"`
+    Name  string `json:"name" validate:"required,max=100"`
     Email string `json:"email"`
 }
 
@@ -234,13 +234,13 @@ app.InterceptorFor(
 ```
 
 ## 권장 환경
-- 최소 Go 버전: 1.25.5
+- 최소 Go 버전: 1.26.0 (playground 검증기 의존성)
 - 검증한 Go 버전: 1.26.0
 
 ## Spine CLI 프로젝트 구조
 
-공개 Spine CLI Preview의 플랫폼 조립 방식과 Spine `v0.7.0-preview.2`에 맞춰 기존 API와 처리 로직을 구성했습니다.
-Go `1.25.5` 이상에서 다음 명령으로 CLI Preview를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
+Spine CLI Preview의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
+이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI Preview를 설치할 수 있습니다.
 
 ```sh
 go install github.com/NARUBROWN/spine-cli/cmd/spine@preview
@@ -249,12 +249,12 @@ spine version
 
 `@preview`는 설치 시점의 CLI Preview 브랜치를 사용합니다. CI 검증 버전은 `.github/example-channels.json`에 고정합니다.
 
-HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v5.4.4`를 사용합니다.
+HTTP 앱은 Spine `v0.7.0-preview.6`, Echo 플랫폼 `v0.2.0-preview.3`, playground 검증기 `v0.2.0-preview.5`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
 `spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
 만든 뼈대에 기존 Bun CRUD, 검증, 오류 매핑과 트랜잭션 처리를 옮겼습니다.
-`spine g route`로 기존 HTTP 메서드와 경로를 명시적으로 등록했습니다.
+HTTP 메서드와 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
 
 ```text
 .
@@ -276,11 +276,11 @@ HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v
 ```
 
 생성자는 `BuildApplication`에서 역할별로 연결하고, HTTP 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
-`spine.New(echoplatform.Option())`로 Echo v5 플랫폼을 선택하며, 내장 OpenAPI 명세와 UI는 `boot.HTTPOptions.OpenAPI`로 설정합니다.
+`spine.New(echoplatform.Option(), spine.WithValidator(validator))`로 Echo v5 플랫폼과 playground를 선택하며, 내장 OpenAPI 명세와 UI는 `boot.HTTPOptions.OpenAPI`로 설정합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
-`spine.toml`에는 `recipe = "platform-contracts-v0.7.0-preview.2"`, `websocket_platform = "none"`,
-`validator = "none"`을 기록합니다. 기존 DTO 검증과 HTTP 오류 처리를 유지하며 별도 검증기는 선택하지 않습니다.
+`spine.toml`에는 `recipe = "platform-contracts-preview"`, `websocket_platform = "none"`,
+`validator = "playground"`를 기록합니다. `BuildApplication`에서 만든 검증기를 실제 요청 검증과 명세 생성에 함께 사용합니다.
 `spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
 
 ```sh
@@ -413,7 +413,11 @@ go test -tags=e2e -v ./e2e
 외부 명세 생성기의 의존성, 주석과 생성 스냅샷을 제거했습니다. 앱을 준비할 때 실제 등록에서 OpenAPI 3.1 명세를 생성하고 메모리에 보관합니다. UI와 정적 파일도 Spine 패키지에서 제공하며 별도 Echo 핸들러나 외부 CDN이 필요하지 않습니다.
 
 ```go
-app := spine.New(echoplatform.Option())
+validator, err := playground.New()
+if err != nil {
+    return nil, boot.Options{}, err
+}
+app := spine.New(echoplatform.Option(), spine.WithValidator(validator))
 
 options := boot.Options{
     HTTP: &boot.HTTPOptions{
@@ -429,15 +433,25 @@ options := boot.Options{
 }
 ```
 
-`swaggerui`는 `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`에서 가져옵니다. JSON은 `/openapi.json`, UI는 `/docs`입니다. 이전 `/swagger/*` 경로는 제공하지 않습니다.
+`playground`는 `github.com/NARUBROWN/spine-validator-playground`, `swaggerui`는 `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`에서 가져옵니다. JSON은 `/openapi.json`, UI는 `/docs`입니다. 이전 `/swagger/*` 경로는 제공하지 않습니다.
 
-이 예제는 `validator = "none"`과 기존 수동 `Validate`를 유지합니다. 따라서 현재 코어 정책에서 런타임 명세는 경로와 메서드 중심이며, `x-spine-diagnostics`에 `VALIDATOR_NOT_CONFIGURED` 진단을 표시합니다. 요청 DTO와 응답 타입의 정적 명세는 다음 명령으로 내보낼 수 있습니다.
+런타임 명세에는 쿼리 `id`, 생성과 수정 요청 본문, `CreateUserResponse`, HTTP 400 오류 구조가 포함됩니다. DTO의 `validate` 태그에서 다음 제약을 읽으며, 같은 검증기가 핸들러 실행 전 요청을 검사합니다.
+
+| 입력 | 검증과 명세 |
+| --- | --- |
+| 쿼리 `id` | 필수 정수, `0` 초과 |
+| 생성과 수정의 `name` | 필수 문자열, 최대 100자 |
+| 생성의 `email` | 필수 문자열, 이메일 형식, 최대 255자 |
+
+태그 검증은 원본 입력에 적용됩니다. 기존 수동 `Validate()`는 그 뒤 문자열 정리, 공백뿐인 이름 거부, 이메일 바이트 길이와 `net/mail` 검사를 유지합니다. 따라서 앞뒤 공백이 있는 이메일이나 정리 전 100자를 넘는 이름은 태그 검증에서 HTTP 400으로 거부됩니다. 생성 요청의 `id`는 DB가 발급하므로 사용하지 않으며, 수정 요청의 `email`도 변경하지 않습니다.
+
+필드 검증 오류는 HTTP 400 응답의 `fields`에 입력 위치, JSON Pointer와 실패 규칙을 담습니다. 정적 명세가 필요하면 다음 명령으로 별도 내보낼 수 있습니다.
 
 ```sh
 spine contract export --format openapi --source static --output openapi.json
 ```
 
-수동 `Validate`의 업무 규칙과 동적 상태 코드, 인증 정책을 자동 추론하지 않습니다. 내장 UI로 바꾸기 위해 문서 전용 검증기를 추가하지 않습니다.
+수동 `Validate()`의 추가 규칙, 동적 상태 코드와 인증 정책은 자동 추론하지 않습니다. 응답 DTO는 `default` 응답에 표시되며, `404`와 `409` 같은 업무 오류를 개별 응답으로 추정하지 않습니다.
 
 ## 컨트롤러 DX의 Preview 후보 조합
 

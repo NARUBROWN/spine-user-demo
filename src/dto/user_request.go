@@ -8,7 +8,7 @@ import (
 
 // UserQuery는 사용자 ID를 쿼리 문자열에서 받습니다.
 type UserQuery struct {
-	ID *int64
+	ID *int64 `validate:"required,gt=0"`
 }
 
 // UserID는 누락된 ID를 0으로 처리합니다.
@@ -21,12 +21,12 @@ func (q *UserQuery) UserID() int {
 
 type CreateUserRequest struct {
 	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name  string `json:"name" validate:"required,max=100"`
+	Email string `json:"email" validate:"required,email,max=255"`
 }
 
 type UpdateUserRequest struct {
-	Name  string `json:"name"`
+	Name  string `json:"name" validate:"required,max=100"`
 	Email string `json:"email"`
 }
 

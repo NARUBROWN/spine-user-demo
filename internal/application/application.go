@@ -12,6 +12,7 @@ import (
 
 	"github.com/NARUBROWN/spine"
 	echoplatform "github.com/NARUBROWN/spine-echo-platform"
+	playground "github.com/NARUBROWN/spine-validator-playground"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	"github.com/NARUBROWN/spine/pkg/boot"
 	"github.com/NARUBROWN/spine/pkg/constructor"
@@ -23,7 +24,11 @@ func BuildApplication() (spine.App, boot.Options, error) {
 	if err := controller.ValidateEnvironment(); err != nil {
 		return nil, boot.Options{}, err
 	}
-	app := spine.New(echoplatform.Option())
+	validator, err := playground.New()
+	if err != nil {
+		return nil, boot.Options{}, err
+	}
+	app := spine.New(echoplatform.Option(), spine.WithValidator(validator))
 	app.Constructor(
 		constructor.Custom(database.NewBunDB),
 		constructor.Repository(&repository.UserRepository{}),
