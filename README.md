@@ -1,6 +1,6 @@
 # spine-user-demo
 
-Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
+Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + 내장 OpenAPI).
 
 **[Spine CLI](https://github.com/NARUBROWN/spine-cli)로 빌드하고 검증한 예제입니다.**
 Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
@@ -41,7 +41,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 Preview 예제는 Spine `v0.7.0-preview.2`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 Preview 소스 예제는 Spine `v0.7.0-preview.7` 후보의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -51,13 +51,25 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 - HTTP 범위 인터셉터가 요청 ID와 처리 시간을 영문 로그로 남깁니다. 유효한 `X-Request-ID`가 있으면 이어서 사용합니다.
 - 성공 응답은 커밋하고 컨트롤러 오류와 응답 준비 오류는 롤백하는 경계를 Docker E2E로 검증합니다.
 
+`constructor`는 `github.com/NARUBROWN/spine/pkg/constructor` 패키지입니다. 사용자 정의를 포함한 다섯 역할을 하나의 `app.Constructor(...)` 호출에 모으며 같은 DI 컨테이너를 공유합니다. `constructor.Controller`는 생성 메서드와 `RegisterRoutes`를, `constructor.Interceptor`는 생성 메서드와 기존 인터셉터 계약을 검사합니다. 인터셉터 적용은 기존 `InterceptorFor`로 지정합니다. 이 API는 미공개 코어 후보 소스에서 검증했습니다.
+
+```go
+app.Constructor(
+    constructor.Custom(database.NewBunDB),
+    constructor.Repository(&repository.UserRepository{}),
+    constructor.Service(&service.UserService{}),
+    constructor.Controller(&controller.UserController{}),
+    constructor.Interceptor(&interceptor.TxInterceptor{}),
+)
+```
+
 생성자 의존성 예시 (Repository -> Service):
 ```go
 type UserRepository struct {
     db bun.IDB
 }
 
-func NewUserRepository(db *bun.DB) *UserRepository {
+func (*UserRepository) Constructor(db *bun.DB) *UserRepository {
     return &UserRepository{db: db}
 }
 
@@ -65,36 +77,33 @@ type UserService struct {
     repo userRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
     return &UserService{repo: repo}
 }
 ```
 
 핵심 특징:
-- 컨테이너에 등록될 컴포넌트는 **생성자 함수**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다.
+- 객체 표식으로 등록하는 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다. 외부 타입의 기존 생성자 함수는 `constructor.Custom(NewX)`로 등록할 수 있습니다.
 - Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
-- `UserQuery`의 `query:"id"` 필드로 쿼리 ID를 받고, 누락과 양수 여부는 핸들러에서 검사합니다.
+- `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 playground가 필수값과 양수 여부를 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
 
 예시:
 ```go
-type UserQuery struct {
-    ID *int64 `query:"id"`
-}
+type UserQuery struct { ID *int64 `validate:"required,gt=0"` }
 
-func (c *UserController) GetUser(
-    ctx context.Context,
-    q *dto.UserQuery,
-) (httpx.Response[dto.CreateUserResponse], error) {
-    userId := q.UserID()
-    if userId <= 0 {
-        return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
-    }
-    user, err := c.userService.Get(ctx, userId)
-    if err != nil {
-        return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
-    }
-    return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
+func (c *UserController) RegisterRoutes(r *api.Registry) {
+    r.GET("/users", func(ctx context.Context, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
+        userId := (*q).UserID()
+        if userId <= 0 {
+            return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
+        }
+        user, err := c.userService.Get(ctx, userId)
+        if err != nil {
+            return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
+        }
+        return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
+    })
 }
 ```
 
@@ -104,12 +113,12 @@ DTO 예시:
 ```go
 type CreateUserRequest struct {
     ID    int    `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    Name  string `json:"name" validate:"required,max=100"`
+    Email string `json:"email" validate:"required,email,max=255"`
 }
 
 type UpdateUserRequest struct {
-    Name  string `json:"name"`
+    Name  string `json:"name" validate:"required,max=100"`
     Email string `json:"email"`
 }
 
@@ -225,13 +234,13 @@ app.InterceptorFor(
 ```
 
 ## 권장 환경
-- 최소 Go 버전: 1.25.5
+- 최소 Go 버전: 1.26.0 (playground 검증기 의존성)
 - 검증한 Go 버전: 1.26.0
 
 ## Spine CLI 프로젝트 구조
 
-공개 Spine CLI Preview의 플랫폼 조립 방식과 Spine `v0.7.0-preview.2`에 맞춰 기존 API와 처리 로직을 구성했습니다.
-Go `1.25.5` 이상에서 다음 명령으로 CLI Preview를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
+Spine CLI Preview의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
+이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI Preview를 설치할 수 있습니다.
 
 ```sh
 go install github.com/NARUBROWN/spine-cli/cmd/spine@preview
@@ -240,12 +249,12 @@ spine version
 
 `@preview`는 설치 시점의 CLI Preview 브랜치를 사용합니다. CI 검증 버전은 `.github/example-channels.json`에 고정합니다.
 
-HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v5.4.4`를 사용합니다.
+HTTP 앱은 Spine `v0.7.0-preview.7`, Echo 플랫폼 `v0.2.0-preview.3`, playground 검증기 `v0.2.0-preview.6`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
 `spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
 만든 뼈대에 기존 Bun CRUD, 검증, 오류 매핑과 트랜잭션 처리를 옮겼습니다.
-`spine g route`로 기존 HTTP 메서드와 경로를 명시적으로 등록했습니다.
+HTTP 메서드와 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
 
 ```text
 .
@@ -260,20 +269,18 @@ HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v
 │   ├── controller/                # 사용자 HTTP 핸들러
 │   ├── service/                   # CRUD와 오류 매핑
 │   ├── repository/                # Bun 쿼리
-│   ├── dto/                       # 요청, 응답과 입력 검증
-│   └── route/route.go             # 사용자 라우트와 선택적 실패 시나리오
+│   └── dto/                       # 요청, 응답과 입력 검증
 ├── migrations/                    # 기존 SQL과 마이그레이션 실행
-├── docs/                          # Swagger 문서
 ├── e2e/
 └── scripts/e2e.sh
 ```
 
-생성자는 `BuildApplication`에서 연결하고, HTTP 경로는 `route.Register(app)`로 등록합니다.
-`spine.New(echoplatform.Option(echoplatform.WithEcho(...)))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
+생성자는 `BuildApplication`에서 역할별로 연결하고, HTTP 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
+`spine.New(echoplatform.Option(), spine.WithValidator(validator))`로 Echo v5 플랫폼과 playground를 선택하며, 내장 OpenAPI 명세와 UI는 `boot.HTTPOptions.OpenAPI`로 설정합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
-`spine.toml`에는 `recipe = "platform-contracts-v0.7.0-preview.2"`, `websocket_platform = "none"`,
-`validator = "none"`을 기록합니다. 기존 DTO 검증과 HTTP 오류 처리를 유지하며 별도 검증기는 선택하지 않습니다.
+`spine.toml`에는 `recipe = "platform-contracts-preview"`, `websocket_platform = "none"`,
+`validator = "playground"`를 기록합니다. `BuildApplication`에서 만든 검증기를 실제 요청 검증과 명세 생성에 함께 사용합니다.
 `spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
 
 ```sh
@@ -328,7 +335,7 @@ HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEM
    # 또는 spine run / go run .
    ```
 5. 서버 주소: `http://localhost:8080`
-6. Swagger UI: `http://localhost:8080/swagger/index.html`
+6. 내장 API UI: `http://localhost:8080/docs`, OpenAPI JSON: `http://localhost:8080/openapi.json`
 
 ## 간단한 호출 예시
 - 조회
@@ -392,3 +399,60 @@ go test -tags=e2e -v ./e2e
 ```
 
 스크립트는 종료할 때 테스트 서버와 MySQL 컨테이너 및 볼륨을 정리합니다. 별도 포트가 필요하면 `SPINE_DEMO_E2E_MYSQL_PORT`와 `SPINE_DEMO_E2E_HTTP_PORT`를 설정할 수 있습니다.
+
+## 컨트롤러 경로 등록 후보
+
+이 소스는 코어 v0.7.0-preview.7 후보의 `api.Controller.RegisterRoutes`를 사용합니다. 공개 코어 태그가 준비되기 전에는 짝이 맞는 로컬 소스 조합에서 검증합니다. 기본 User 앱과 기존 DB를 자동으로 이전하거나 재기동하지 않습니다.
+
+`src/controller/user_controller.go`가 CRUD 경로와 콜백을 함께 선언하고 `internal/application`은 구체 생성자를 등록합니다. 별도 src/route/route.go는 사용하지 않습니다. Query와 Body는 `input.Query[dto.UserQuery]`, `input.Body[dto.CreateUserRequest]` 등으로 받으며 기존 DTO 정규화와 검증, 트랜잭션, 오류 응답 및 선택적 실패와 보안 시나리오를 유지합니다.
+
+준비 전 `spine.DescribeHTTP`는 생성자를 실행하지 않고 ErrRoutesNotCollected를 반환합니다. CLI 정적 내보내기를 사용하거나, 앱을 명시적으로 Prepare한 뒤 DescribePreparedHTTP를 조회하세요. DB와 브로커 초기화는 명시한 준비 과정의 일부입니다.
+
+## 내장 OpenAPI와 API UI
+
+외부 명세 생성기의 의존성, 주석과 생성 스냅샷을 제거했습니다. 앱을 준비할 때 실제 등록에서 OpenAPI 3.1 명세를 생성하고 메모리에 보관합니다. UI와 정적 파일도 Spine 패키지에서 제공하며 별도 Echo 핸들러나 외부 CDN이 필요하지 않습니다.
+
+```go
+validator, err := playground.New()
+if err != nil {
+    return nil, boot.Options{}, err
+}
+app := spine.New(echoplatform.Option(), spine.WithValidator(validator))
+
+options := boot.Options{
+    HTTP: &boot.HTTPOptions{
+        OpenAPI: boot.OpenAPIOptions{
+            Enabled: true,
+            Title: "Spine User Demo API",
+            Version: "0.2.0",
+            UI: []boot.OpenAPIUI{
+                swaggerui.New(swaggerui.Options{Title: "Spine User Demo API"}),
+            },
+        },
+    },
+}
+```
+
+`playground`는 `github.com/NARUBROWN/spine-validator-playground`, `swaggerui`는 `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`에서 가져옵니다. JSON은 `/openapi.json`, UI는 `/docs`입니다. 이전 `/swagger/*` 경로는 제공하지 않습니다.
+
+런타임 명세에는 쿼리 `id`, 생성과 수정 요청 본문, `CreateUserResponse`, HTTP 400 오류 구조가 포함됩니다. DTO의 `validate` 태그에서 다음 제약을 읽으며, 같은 검증기가 핸들러 실행 전 요청을 검사합니다.
+
+| 입력 | 검증과 명세 |
+| --- | --- |
+| 쿼리 `id` | 필수 정수, `0` 초과 |
+| 생성과 수정의 `name` | 필수 문자열, 최대 100자 |
+| 생성의 `email` | 필수 문자열, 이메일 형식, 최대 255자 |
+
+태그 검증은 원본 입력에 적용됩니다. 기존 수동 `Validate()`는 그 뒤 문자열 정리, 공백뿐인 이름 거부, 이메일 바이트 길이와 `net/mail` 검사를 유지합니다. 따라서 앞뒤 공백이 있는 이메일이나 정리 전 100자를 넘는 이름은 태그 검증에서 HTTP 400으로 거부됩니다. 생성 요청의 `id`는 DB가 발급하므로 사용하지 않으며, 수정 요청의 `email`도 변경하지 않습니다.
+
+필드 검증 오류는 HTTP 400 응답의 `fields`에 입력 위치, JSON Pointer와 실패 규칙을 담습니다. 정적 명세가 필요하면 다음 명령으로 별도 내보낼 수 있습니다.
+
+```sh
+spine contract export --format openapi --source static --output openapi.json
+```
+
+수동 `Validate()`의 추가 규칙, 동적 상태 코드와 인증 정책은 자동 추론하지 않습니다. 응답 DTO는 `default` 응답에 표시되며, `404`와 `409` 같은 업무 오류를 개별 응답으로 추정하지 않습니다.
+
+## 컨트롤러 DX의 Preview 후보 조합
+
+코어 `v0.7.0-preview.7`, CLI `v0.4.3-preview.8`와 함께 사용하는 소스 후보입니다. `spine.toml`의 `platform-contracts-preview` 레시피는 Preview 브랜치 조회를 선택하며 실제 고정 의존성은 `go.mod`를 따릅니다. 아직 공개되지 않은 후보를 설치 완료로 해석하지 않습니다. User 예제에는 별도의 공개 버전 태그를 만들지 않으며 코어와 CLI의 공개 설치 및 원격 CI 검증은 발행 단계에서 수행합니다.

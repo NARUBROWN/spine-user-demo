@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	appspine "github.com/NARUBROWN/spine"
+	"github.com/NARUBROWN/spine/pkg/api"
+	"github.com/NARUBROWN/spine/pkg/input"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -68,9 +71,7 @@ func TestSecurityPipeline(t *testing.T) {
 	var calls atomic.Int64
 	app := platform.New()
 	app.Constructor(func() *securityController { return &securityController{calls: &calls} })
-	app.Route("POST", "/protected", (*securityController).Create, route.WithInterceptors(
-		&SecurityTokenInterceptor{Token: "test-token"}, &securityMarkerInterceptor{},
-	))
+
 	prepared, err := app.Prepare(context.Background(), boot.Options{HTTP: &boot.HTTPOptions{MaxBodyBytes: 64}})
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +83,10 @@ func TestSecurityPipeline(t *testing.T) {
 			t.Errorf("Close: %v", err)
 		}
 	})
-	handler := prepared.Handler()
+	handler, err := appspine.NetHTTPHandler(prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name, authorization, body string
@@ -148,4 +152,10 @@ func TestSecurityPipeline(t *testing.T) {
 			t.Fatalf("controller calls = %d, want %d", got, requests)
 		}
 	})
+}
+
+func (c *securityController) RegisterRoutes(r *api.Registry) {
+	r.POST("/protected", func(a input.Body[securityRequest], ctx spine.Ctx) httpx.Response[securityResponse] {
+		return c.Create((*securityRequest)(a), ctx)
+	}, route.WithInterceptors(&SecurityTokenInterceptor{Token: "test-token"}, &securityMarkerInterceptor{}))
 }

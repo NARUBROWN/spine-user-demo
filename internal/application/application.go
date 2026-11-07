@@ -8,29 +8,33 @@ import (
 	"spine-user-demo/internal/interceptor"
 	"spine-user-demo/src/controller"
 	"spine-user-demo/src/repository"
-	"spine-user-demo/src/route"
 	"spine-user-demo/src/service"
 
 	"github.com/NARUBROWN/spine"
 	echoplatform "github.com/NARUBROWN/spine-echo-platform"
+	playground "github.com/NARUBROWN/spine-validator-playground"
 	"github.com/NARUBROWN/spine/interceptor/cors"
 	"github.com/NARUBROWN/spine/pkg/boot"
-	"github.com/labstack/echo/v5"
-	httpSwagger "github.com/swaggo/http-swagger"
-	_ "spine-user-demo/docs"
+	"github.com/NARUBROWN/spine/pkg/constructor"
+	"github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui"
 )
 
 // BuildApplication은 서버와 CLI가 공유하는 구성 진입점이며 DB 연결이나 리스너를 시작하지 않습니다.
 func BuildApplication() (spine.App, boot.Options, error) {
-	app := spine.New(echoplatform.Option(echoplatform.WithEcho(func(e *echo.Echo) {
-		e.GET("/swagger/*", echo.WrapHandler(httpSwagger.WrapHandler))
-	})))
+	if err := controller.ValidateEnvironment(); err != nil {
+		return nil, boot.Options{}, err
+	}
+	validator, err := playground.New()
+	if err != nil {
+		return nil, boot.Options{}, err
+	}
+	app := spine.New(echoplatform.Option(), spine.WithValidator(validator))
 	app.Constructor(
-		database.NewBunDB,
-		repository.NewUserRepository,
-		service.NewUserService,
-		controller.NewUserController,
-		interceptor.NewTxInterceptor,
+		constructor.Custom(database.NewBunDB),
+		constructor.Repository(&repository.UserRepository{}),
+		constructor.Service(&service.UserService{}),
+		constructor.Controller(&controller.UserController{}),
+		constructor.Interceptor(&interceptor.TxInterceptor{}),
 	)
 	app.InterceptorFor(
 		boot.InterceptorHTTP,
@@ -42,9 +46,6 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		(*interceptor.TxInterceptor)(nil),
 		&interceptor.LoggingInterceptor{},
 	)
-	if err := route.Register(app); err != nil {
-		return nil, boot.Options{}, err
-	}
 
 	address := os.Getenv("SPINE_DEMO_ADDRESS")
 	if address == "" {
@@ -58,6 +59,13 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		Address:                address,
 		EnableGracefulShutdown: true,
 		ShutdownTimeout:        10 * time.Second,
-		HTTP:                   &boot.HTTPOptions{},
+		HTTP: &boot.HTTPOptions{
+			OpenAPI: boot.OpenAPIOptions{
+				Enabled: true,
+				Title:   "Spine User Demo API",
+				Version: "0.2.0",
+				UI:      []boot.OpenAPIUI{swaggerui.New(swaggerui.Options{Title: "Spine User Demo API"})},
+			},
+		},
 	}, nil
 }
