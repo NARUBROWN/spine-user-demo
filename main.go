@@ -12,11 +12,6 @@ import (
 	"spine-user-demo/migrations"
 )
 
-// @title Spine User Demo API
-// @version 0.2.0
-// @description Spine + Swaggo
-// @host localhost:8080
-// @BasePath /
 func main() {
 	migrateOnly := flag.Bool("migrate", false, "Run database migrations and exit")
 	flag.Parse()

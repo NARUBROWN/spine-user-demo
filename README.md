@@ -1,6 +1,6 @@
 # spine-user-demo
 
-Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
+Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + 내장 OpenAPI).
 
 **[Spine CLI](https://github.com/NARUBROWN/spine-cli)로 빌드하고 검증한 예제입니다.**
 Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
@@ -267,16 +267,14 @@ HTTP 앱은 Spine `v0.7.0-preview.2`, Echo 플랫폼 `v0.2.0-preview.1`, Echo `v
 │   ├── controller/                # 사용자 HTTP 핸들러
 │   ├── service/                   # CRUD와 오류 매핑
 │   ├── repository/                # Bun 쿼리
-│   ├── dto/                       # 요청, 응답과 입력 검증
-│   └── route/route.go             # 사용자 라우트와 선택적 실패 시나리오
+│   └── dto/                       # 요청, 응답과 입력 검증
 ├── migrations/                    # 기존 SQL과 마이그레이션 실행
-├── docs/                          # Swagger 문서
 ├── e2e/
 └── scripts/e2e.sh
 ```
 
-생성자는 `BuildApplication`에서 연결하고, HTTP 경로는 `route.Register(app)`로 등록합니다.
-`spine.New(echoplatform.Option(echoplatform.WithEcho(...)))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
+생성자는 `BuildApplication`에서 역할별로 연결하고, HTTP 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
+`spine.New(echoplatform.Option())`로 Echo v5 플랫폼을 선택하며, 내장 OpenAPI 명세와 UI는 `boot.HTTPOptions.OpenAPI`로 설정합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
 `spine.toml`에는 `recipe = "platform-contracts-v0.7.0-preview.2"`, `websocket_platform = "none"`,
@@ -335,7 +333,7 @@ HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEM
    # 또는 spine run / go run .
    ```
 5. 서버 주소: `http://localhost:8080`
-6. Swagger UI: `http://localhost:8080/swagger/index.html`
+6. 내장 API UI: `http://localhost:8080/docs`, OpenAPI JSON: `http://localhost:8080/openapi.json`
 
 ## 간단한 호출 예시
 - 조회
@@ -408,4 +406,33 @@ go test -tags=e2e -v ./e2e
 
 준비 전 `spine.DescribeHTTP`는 생성자를 실행하지 않고 ErrRoutesNotCollected를 반환합니다. CLI 정적 내보내기를 사용하거나, 앱을 명시적으로 Prepare한 뒤 DescribePreparedHTTP를 조회하세요. DB와 브로커 초기화는 명시한 준비 과정의 일부입니다.
 
-기존 Swagger UI와 추적 중인 Swagger 스냅샷은 유지합니다. Swaggo의 메서드 주석 수집이 익명 콜백을 자동으로 해석한다고 가정하지 않습니다. 새 코드의 경로와 요청 타입 변경은 `spine contract export --format openapi --source static --output openapi.json`으로 확인하세요. 수동 Validate의 업무 규칙과 동적 상태 코드는 자동 추론하지 않습니다.
+## 내장 OpenAPI와 API UI
+
+외부 명세 생성기의 의존성, 주석과 생성 스냅샷을 제거했습니다. 앱을 준비할 때 실제 등록에서 OpenAPI 3.1 명세를 생성하고 메모리에 보관합니다. UI와 정적 파일도 Spine 패키지에서 제공하며 별도 Echo 핸들러나 외부 CDN이 필요하지 않습니다.
+
+```go
+app := spine.New(echoplatform.Option())
+
+options := boot.Options{
+    HTTP: &boot.HTTPOptions{
+        OpenAPI: boot.OpenAPIOptions{
+            Enabled: true,
+            Title: "Spine User Demo API",
+            Version: "0.2.0",
+            UI: []boot.OpenAPIUI{
+                swaggerui.New(swaggerui.Options{Title: "Spine User Demo API"}),
+            },
+        },
+    },
+}
+```
+
+`swaggerui`는 `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`에서 가져옵니다. JSON은 `/openapi.json`, UI는 `/docs`입니다. 이전 `/swagger/*` 경로는 제공하지 않습니다.
+
+이 예제는 `validator = "none"`과 기존 수동 `Validate`를 유지합니다. 따라서 현재 코어 정책에서 런타임 명세는 경로와 메서드 중심이며, `x-spine-diagnostics`에 `VALIDATOR_NOT_CONFIGURED` 진단을 표시합니다. 요청 DTO와 응답 타입의 정적 명세는 다음 명령으로 내보낼 수 있습니다.
+
+```sh
+spine contract export --format openapi --source static --output openapi.json
+```
+
+수동 `Validate`의 업무 규칙과 동적 상태 코드, 인증 정책을 자동 추론하지 않습니다. 내장 UI로 바꾸기 위해 문서 전용 검증기를 추가하지 않습니다.

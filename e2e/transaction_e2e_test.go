@@ -35,15 +35,43 @@ func TestHTTPContractsAndTransactionBoundaries(t *testing.T) {
 		t.Cleanup(func() { _, _ = db.Exec("DELETE FROM users WHERE email = ?", email) })
 	}
 
-	t.Run("native Swagger route serves the API document", func(t *testing.T) {
-		status, body := requestJSON(t, http.MethodGet, baseURL+"/swagger/doc.json", "")
+	t.Run("Spine OpenAPI serves the registered API", func(t *testing.T) {
+		status, body := requestJSON(t, http.MethodGet, baseURL+"/openapi.json", "")
 		assertStatus(t, status, http.StatusOK)
 		var document struct {
-			Paths map[string]json.RawMessage `json:"paths"`
+			OpenAPI string `json:"openapi"`
+			Info    struct {
+				Title string `json:"title"`
+			} `json:"info"`
+			Paths map[string]map[string]json.RawMessage `json:"paths"`
 		}
-		if err := json.Unmarshal([]byte(body), &document); err != nil || document.Paths["/users"] == nil {
-			t.Fatalf("Swagger user API document: %v, body=%s", err, body)
+		if err := json.Unmarshal([]byte(body), &document); err != nil || !strings.HasPrefix(document.OpenAPI, "3.1.") || document.Info.Title != "Spine User Demo API" {
+			t.Fatalf("OpenAPI document: %v, body=%s", err, body)
 		}
+		for _, method := range []string{"get", "post", "put", "delete"} {
+			if document.Paths["/users"][method] == nil {
+				t.Fatalf("missing %s /users", method)
+			}
+		}
+		for _, path := range []string{"/scenarios/transactions/controller-error", "/scenarios/transactions/response-error", "/scenarios/security/users"} {
+			if document.Paths[path]["post"] == nil {
+				t.Fatalf("missing runtime scenario %s", path)
+			}
+		}
+	})
+	t.Run("embedded documentation UI and assets", func(t *testing.T) {
+		for _, path := range []string{"/docs", "/docs/_assets/init.js", "/docs/_assets/swagger-ui-bundle.js", "/docs/_assets/swagger-ui.css", "/docs/_assets/LICENSE"} {
+			status, body := requestJSON(t, http.MethodGet, baseURL+path, "")
+			assertStatus(t, status, http.StatusOK)
+			if body == "" {
+				t.Fatalf("empty resource: %s", path)
+			}
+			if path == "/docs" && !strings.Contains(body, "swagger-ui") {
+				t.Fatal("embedded UI is missing")
+			}
+		}
+		status, _ := requestJSON(t, http.MethodGet, baseURL+"/swagger/doc.json", "")
+		assertStatus(t, status, http.StatusNotFound)
 	})
 
 	t.Run("successful response commits", func(t *testing.T) {
