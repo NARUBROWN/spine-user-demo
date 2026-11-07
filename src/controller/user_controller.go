@@ -41,7 +41,8 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		r.Error(err)
 		return
 	}
-	r.GET("/users", func(
+	users := r.Group("/users", api.Tags("Users"))
+	users.GET("/", api.Options(api.Summary("사용자 조회")), func(
 		ctx context.Context,
 		q input.Query[dto.UserQuery],
 	) (httpx.Response[dto.CreateUserResponse], error) {
@@ -59,7 +60,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 			Body: user,
 		}, nil
 	})
-	r.POST("/users", func(
+	users.POST("/", api.Options(api.Summary("사용자 생성")), func(
 		ctx context.Context,
 		req input.Body[dto.CreateUserRequest],
 		spineCtx spine.Ctx,
@@ -79,7 +80,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 			Body: user,
 		}, nil
 	})
-	r.PUT("/users", func(
+	users.PUT("/", api.Options(api.Summary("사용자 수정")), func(
 		ctx context.Context,
 		q input.Query[dto.UserQuery],
 		req input.Body[dto.UpdateUserRequest],
@@ -106,7 +107,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 			Body: user,
 		}, nil
 	})
-	r.DELETE("/users", func(
+	users.DELETE("/", api.Options(api.Summary("사용자 삭제")), func(
 		ctx context.Context,
 		q input.Query[dto.UserQuery],
 		spineCtx spine.Ctx,

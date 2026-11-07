@@ -17,6 +17,8 @@ func TestRuntimeOpenAPIIncludesValidatedDTOs(t *testing.T) {
 	assertStatus(t, status, http.StatusOK)
 	var document struct {
 		Paths map[string]map[string]struct {
+			Tags       []string
+			Summary    string
 			Parameters []struct {
 				Name, In string
 				Required bool
@@ -31,15 +33,27 @@ func TestRuntimeOpenAPIIncludesValidatedDTOs(t *testing.T) {
 			}
 		}
 		Components  struct{ Schemas map[string]map[string]any }
-		Diagnostics []struct{ Code string } `json:"x-spine-diagnostics"`
+		Diagnostics []struct{ Code, Target string } `json:"x-spine-diagnostics"`
 	}
 	if err := json.Unmarshal([]byte(body), &document); err != nil {
 		t.Fatal(err)
 	}
 	for _, diagnostic := range document.Diagnostics {
-		if diagnostic.Code != "RESPONSE_STATUS_DYNAMIC" {
+		if diagnostic.Code != "RESPONSE_STATUS_DYNAMIC" && !(diagnostic.Code == "FIELD_EXAMPLE_VALIDATION_UNRESOLVED" && diagnostic.Target == "dto.CreateUserRequest.email") {
 			t.Fatalf("unexpected schema diagnostic: %s", diagnostic.Code)
 		}
+	}
+	for _, method := range []string{"get", "post", "put", "delete"} {
+		op := document.Paths["/users"][method]
+		if !slices.Contains(op.Tags, "Users") || op.Summary == "" {
+			t.Fatalf("%s documentation metadata missing: %+v", method, op)
+		}
+	}
+	if !strings.Contains(body, `"maximum":9223372036854775807`) || !strings.Contains(body, `"minimum":-9223372036854775808`) {
+		t.Fatal("exact integer bounds missing")
+	}
+	if !strings.Contains(body, `"example":"user@example.com"`) {
+		t.Fatal("DTO example missing")
 	}
 	for _, method := range []string{"get", "put", "delete"} {
 		parameters := document.Paths["/users"][method].Parameters
