@@ -1,5 +1,9 @@
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
+github.com/NARUBROWN/spine v0.7.0-preview.6 h1:lgAWAaR+5mWtdKHE4rj3PgbJntz8xcKexqPM7tqZhFA=
+github.com/NARUBROWN/spine v0.7.0-preview.6/go.mod h1:A0JJcUelvcyn3DW+VkSTHJfvKBegrMNKfXCq8tbiXJ4=
+github.com/NARUBROWN/spine-echo-platform v0.2.0-preview.3 h1:cKsrEPPlRZs0SqBwzzLHqoldLY/jBhZzSRQJzmPYPT4=
+github.com/NARUBROWN/spine-echo-platform v0.2.0-preview.3/go.mod h1:/vN8upRFYTCcPfXJfw/B+kNPBeZ8Uf/VLazVm19HqCU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-sql-driver/mysql v1.9.3 h1:U/N249h2WzJ3Ukj8SowVFjdtZKfu9vlLZxjPXV1aweo=
