@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"spine-user-demo/internal/config"
 	"spine-user-demo/internal/database"
 	"spine-user-demo/internal/interceptor"
 	"spine-user-demo/src/controller"
@@ -21,7 +22,7 @@ import (
 
 // BuildApplication은 서버와 CLI가 공유하는 구성 진입점이며 DB 연결이나 리스너를 시작하지 않습니다.
 func BuildApplication() (spine.App, boot.Options, error) {
-	if err := controller.ValidateEnvironment(); err != nil {
+	if err := config.ValidateEnvironment(); err != nil {
 		return nil, boot.Options{}, err
 	}
 	validator, err := playground.New()
