@@ -509,9 +509,9 @@ E2E는 다음 경계를 실제 MySQL 행 수로 확인합니다.
 - 선택적 보호 라우트의 인증 실패 시 사용자 행이 추가되지 않음
 - 인증되지 않은 잘못된 본문은 바인딩 전에 거부되고, 유효한 인증의 잘못된 본문은 400으로 처리됨
 
-컨트롤러·응답 오류 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다.
+컨트롤러, 응답 오류 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다.
 
-보안 검증용 `POST /scenarios/security/users`는 `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1`과 비어 있지 않은 `SPINE_DEMO_SECURITY_TOKEN`을 함께 지정해야 등록됩니다. `Authorization: Bearer <토큰>`을 검사하고, 본문 처리는 인증 성공 후에 진행합니다. 이 토큰은 테스트용 공유 자격 증명이며 사용자별 인증·인가 예제는 아닙니다. 기존 `/users` 경로에는 이 인증이 적용되지 않습니다. E2E 스크립트는 격리된 로컬 실행에만 사용할 임시 테스트 토큰을 설정합니다.
+보안 검증용 `POST /scenarios/security/users`는 `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1`과 비어 있지 않은 `SPINE_DEMO_SECURITY_TOKEN`을 함께 지정해야 등록됩니다. `Authorization: Bearer <토큰>`을 검사하고, 본문 처리는 인증 성공 후에 진행합니다. 이 토큰은 테스트용 공유 자격 증명이며 사용자별 인증, 인가 예제는 아닙니다. 기존 `/users` 경로에는 이 인증이 적용되지 않습니다. E2E 스크립트는 격리된 로컬 실행에만 사용할 임시 테스트 토큰을 설정합니다.
 
 `internal/interceptor`의 HTTP 파이프라인 테스트는 인증 실패와 잘못된 본문에서 컨트롤러 미실행, 작은 본문 제한의 적용, 동시 요청의 컨텍스트 격리를 검사합니다. 해당 테스트는 MySQL 없이 Spine과 Echo 플랫폼의 `Prepare` 경로를 사용합니다. 직접 외부 인프라에 연결해 E2E를 실행할 때는 서버에도 보안 시나리오 활성화 변수와 토큰을 지정한 뒤 다음 환경 변수를 사용합니다.
 
