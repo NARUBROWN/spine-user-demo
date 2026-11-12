@@ -35,16 +35,14 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		constructor.Service(&service.UserService{}),
 		constructor.Controller(&controller.UserController{}),
 		constructor.Interceptor(&interceptor.TxInterceptor{}),
+		constructor.Interceptor(&interceptor.LoggingInterceptor{}),
+		constructor.Interceptor(&interceptor.SecurityTokenInterceptor{}),
+		constructor.Custom(interceptor.NewCORSInterceptor),
 	)
-	app.InterceptorFor(
-		boot.InterceptorHTTP,
-		cors.New(cors.Config{
-			AllowOrigins: []string{"*"},
-			AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowHeaders: []string{"Content-Type"},
-		}),
+	app.InterceptorFor(boot.InterceptorHTTP,
+		(*cors.CORSInterceptor)(nil),
 		(*interceptor.TxInterceptor)(nil),
-		&interceptor.LoggingInterceptor{},
+		(*interceptor.LoggingInterceptor)(nil),
 	)
 
 	address := os.Getenv("SPINE_DEMO_ADDRESS")
@@ -62,6 +60,7 @@ func BuildApplication() (spine.App, boot.Options, error) {
 		HTTP: &boot.HTTPOptions{
 			OpenAPI: boot.OpenAPIOptions{
 				Enabled: true,
+				Path:    "/openapi.json",
 				Title:   "Spine User Demo API",
 				Version: "0.2.0",
 				UI:      []boot.OpenAPIUI{swaggerui.New(swaggerui.Options{Title: "Spine User Demo API"})},

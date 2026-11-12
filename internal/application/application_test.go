@@ -41,7 +41,7 @@ func TestBuildApplicationConfiguresNativeOpenAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.HTTP == nil || !options.HTTP.OpenAPI.Enabled || options.HTTP.OpenAPI.DocumentPath() != "/openapi.json" || len(options.HTTP.OpenAPI.UI) != 1 {
+	if options.HTTP == nil || !options.HTTP.OpenAPI.Enabled || options.HTTP.OpenAPI.Path != "/openapi.json" || len(options.HTTP.OpenAPI.UI) != 1 {
 		t.Fatalf("OpenAPI options: %+v", options.HTTP)
 	}
 	if err = app.Validate(options); err != nil {
