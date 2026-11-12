@@ -579,4 +579,4 @@ spine contract export --format openapi --source static --output openapi.json
 
 ## 정식 의존성
 
-Spine `v0.7.5`, CLI `v0.4.4`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `released`로 지정합니다.
+Spine `v0.7.5`, CLI `v0.4.4`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `main`로 지정합니다.
