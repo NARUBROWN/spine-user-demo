@@ -3,10 +3,9 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
-
 	"net/http"
 	"os"
+
 	"spine-user-demo/internal/interceptor"
 
 	"spine-user-demo/src/dto"
@@ -37,13 +36,9 @@ func (*UserController) Constructor(userService *service.UserService) *UserContro
 
 // RegisterRoutes는 경로와 요청 처리 코드를 함께 등록합니다.
 func (c *UserController) RegisterRoutes(r *api.Registry) {
-	if err := ValidateEnvironment(); err != nil {
-		r.Error(err)
-		return
-	}
 	users := r.Group("/users", api.Tags("Users"))
 	users.GET("/", func(
-		ctx context.Context,
+		ctx spine.Ctx,
 		q input.Query[dto.UserQuery],
 	) (httpx.Response[dto.CreateUserResponse], error) {
 		userId := (*q).UserID()
@@ -51,7 +46,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 			return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
 		}
 
-		user, err := c.userService.Get(ctx, userId)
+		user, err := c.userService.Get(ctx.ExecutionContext().Context(), userId)
 		if err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
 		}
@@ -61,18 +56,17 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		}, nil
 	}, api.Summary("사용자 조회"))
 	users.POST("/", func(
-		ctx context.Context,
+		ctx spine.Ctx,
 		req input.Body[dto.CreateUserRequest],
-		spineCtx spine.Ctx,
 	) (httpx.Response[dto.CreateUserResponse], error) {
 		if err := (*req).Validate(); err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest(err.Error())
 		}
-		tx, err := transactionFrom(spineCtx)
+		tx, err := transactionFrom(ctx)
 		if err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, err
 		}
-		user, err := c.userService.Create(ctx, tx, req.Name, req.Email)
+		user, err := c.userService.Create(ctx.ExecutionContext().Context(), tx, req.Name, req.Email)
 		if err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
 		}
@@ -81,10 +75,9 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		}, nil
 	}, api.Summary("사용자 생성"))
 	users.PUT("/", func(
-		ctx context.Context,
+		ctx spine.Ctx,
 		q input.Query[dto.UserQuery],
 		req input.Body[dto.UpdateUserRequest],
-		spineCtx spine.Ctx,
 	) (httpx.Response[dto.CreateUserResponse], error) {
 		if err := (*req).Validate(); err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest(err.Error())
@@ -93,12 +86,12 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		if userId <= 0 {
 			return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
 		}
-		tx, err := transactionFrom(spineCtx)
+		tx, err := transactionFrom(ctx)
 		if err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, err
 		}
 
-		user, err := c.userService.Update(ctx, tx, userId, req.Name)
+		user, err := c.userService.Update(ctx.ExecutionContext().Context(), tx, userId, req.Name)
 		if err != nil {
 			return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
 		}
@@ -108,54 +101,51 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		}, nil
 	}, api.Summary("사용자 수정"))
 	users.DELETE("/", func(
-		ctx context.Context,
+		ctx spine.Ctx,
 		q input.Query[dto.UserQuery],
-		spineCtx spine.Ctx,
 	) error {
 		userId := (*q).UserID()
 		if userId <= 0 {
 			return httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
 		}
-		tx, err := transactionFrom(spineCtx)
+		tx, err := transactionFrom(ctx)
 		if err != nil {
 			return err
 		}
-		if err := c.userService.Delete(ctx, tx, userId); err != nil {
+		if err := c.userService.Delete(ctx.ExecutionContext().Context(), tx, userId); err != nil {
 			return mapServiceError(err)
 		}
 		return nil
 	}, api.Summary("사용자 삭제"))
 	if os.Getenv("SPINE_DEMO_ENABLE_FAILURE_SCENARIOS") == "1" {
 		r.POST("/scenarios/transactions/controller-error", func(
-			ctx context.Context,
+			ctx spine.Ctx,
 			req input.Body[dto.CreateUserRequest],
-			spineCtx spine.Ctx,
 		) error {
 			if err := (*req).Validate(); err != nil {
 				return httperr.BadRequest(err.Error())
 			}
-			tx, err := transactionFrom(spineCtx)
+			tx, err := transactionFrom(ctx)
 			if err != nil {
 				return err
 			}
-			if _, err := c.userService.Create(ctx, tx, req.Name, req.Email); err != nil {
+			if _, err := c.userService.Create(ctx.ExecutionContext().Context(), tx, req.Name, req.Email); err != nil {
 				return mapServiceError(err)
 			}
 			return httperr.BadRequest("의도적으로 컨트롤러 오류를 발생시켰습니다.")
 		})
 		r.POST("/scenarios/transactions/response-error", func(
-			ctx context.Context,
+			ctx spine.Ctx,
 			req input.Body[dto.CreateUserRequest],
-			spineCtx spine.Ctx,
 		) (httpx.Response[dto.CreateUserResponse], error) {
 			if err := (*req).Validate(); err != nil {
 				return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest(err.Error())
 			}
-			tx, err := transactionFrom(spineCtx)
+			tx, err := transactionFrom(ctx)
 			if err != nil {
 				return httpx.Response[dto.CreateUserResponse]{}, err
 			}
-			user, err := c.userService.Create(ctx, tx, req.Name, req.Email)
+			user, err := c.userService.Create(ctx.ExecutionContext().Context(), tx, req.Name, req.Email)
 			if err != nil {
 				return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
 			}
@@ -168,23 +158,18 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		})
 	}
 	if os.Getenv("SPINE_DEMO_ENABLE_SECURITY_SCENARIOS") == "1" {
-		if os.Getenv("SPINE_DEMO_SECURITY_TOKEN") == "" {
-			r.Error(fmt.Errorf("SPINE_DEMO_SECURITY_TOKEN is required for security scenarios"))
-			return
-		}
 		r.POST("/scenarios/security/users", func(
-			ctx context.Context,
+			ctx spine.Ctx,
 			req input.Body[dto.CreateUserRequest],
-			spineCtx spine.Ctx,
 		) (httpx.Response[dto.CreateUserResponse], error) {
 			if err := (*req).Validate(); err != nil {
 				return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest(err.Error())
 			}
-			tx, err := transactionFrom(spineCtx)
+			tx, err := transactionFrom(ctx)
 			if err != nil {
 				return httpx.Response[dto.CreateUserResponse]{}, err
 			}
-			user, err := c.userService.Create(ctx, tx, req.Name, req.Email)
+			user, err := c.userService.Create(ctx.ExecutionContext().Context(), tx, req.Name, req.Email)
 			if err != nil {
 				return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
 			}
@@ -216,12 +201,4 @@ func mapServiceError(err error) error {
 	default:
 		return err
 	}
-}
-
-// ValidateEnvironment는 생성자 실행 전에 선택적 보안 시나리오 설정을 검사합니다.
-func ValidateEnvironment() error {
-	if os.Getenv("SPINE_DEMO_ENABLE_SECURITY_SCENARIOS") == "1" && os.Getenv("SPINE_DEMO_SECURITY_TOKEN") == "" {
-		return fmt.Errorf("SPINE_DEMO_SECURITY_TOKEN is required for security scenarios")
-	}
-	return nil
 }

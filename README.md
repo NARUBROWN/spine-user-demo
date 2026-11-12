@@ -84,7 +84,7 @@ func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
 
 핵심 특징:
 - 객체 표식으로 등록하는 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다. 외부 타입의 기존 생성자 함수는 `constructor.Custom(NewX)`로 등록할 수 있습니다.
-- Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
+- Controller는 `spine.Ctx`와 명시적 Query 및 Body 래퍼를 받습니다. 서비스와 저장소에 전달할 표준 컨텍스트는 `ctx.ExecutionContext().Context()`로 꺼냅니다.
 - `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 playground가 필수값과 양수 여부를 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
 
@@ -93,12 +93,12 @@ func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
 type UserQuery struct { ID *int64 `validate:"required,gt=0"` }
 
 func (c *UserController) RegisterRoutes(r *api.Registry) {
-    r.GET("/users", func(ctx context.Context, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
+    r.GET("/users", func(ctx spine.Ctx, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
         userId := (*q).UserID()
         if userId <= 0 {
             return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
         }
-        user, err := c.userService.Get(ctx, userId)
+        user, err := c.userService.Get(ctx.ExecutionContext().Context(), userId)
         if err != nil {
             return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
         }
@@ -436,9 +436,9 @@ spine contract probe --root . --json
 `./scripts/check.sh`는 위 검사와 CLI 빌드, race 검사를 함께 실행합니다.
 다른 위치의 CLI를 사용하려면 `SPINE_CLI_BIN=/경로/spine ./scripts/check.sh`로 지정합니다.
 
-HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1일 때만 계약과 앱에
-포함됩니다. CLI 검사와 서버 실행에 같은 환경변수를 전달해야 합니다. 부분 probe는 DB 연결이나
-실제 HTTP, 인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
+`BuildApplication`은 `internal/config.ValidateEnvironment`를 호출해 보안 시나리오에 필요한 토큰을 앱 조립 전에 검증합니다. 토큰이 없으면 `boot.ConfigError`를 반환합니다. 컨트롤러에서는 키를 검증하지 않습니다.
+
+CLI가 해석할 수 있도록 테스트 라우트는 `RegisterRoutes`에서 환경 변수의 `"1"` 여부를 직접 비교해 등록합니다. `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS`는 오류와 롤백 검증용 라우트를, `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS`는 인증 검증용 라우트를 활성화합니다. CLI 검사와 서버 실행에 같은 환경 변수를 전달해야 합니다. 부분 probe는 DB 연결이나 실제 HTTP, 인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
 
 ## 실행 방법
 1. MySQL DSN 설정
