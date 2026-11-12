@@ -30,7 +30,7 @@ type UserService struct {
 	repo userRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
 	return &UserService{repo: repo}
 }
 

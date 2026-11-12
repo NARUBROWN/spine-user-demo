@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	appspine "github.com/NARUBROWN/spine"
+	"github.com/NARUBROWN/spine/pkg/api"
+	"github.com/NARUBROWN/spine/pkg/input"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,8 +20,9 @@ import (
 	"github.com/NARUBROWN/spine/core"
 	"github.com/NARUBROWN/spine/pkg/boot"
 	"github.com/NARUBROWN/spine/pkg/httpx"
-	"github.com/NARUBROWN/spine/pkg/route"
+
 	"github.com/NARUBROWN/spine/pkg/spine"
+	spinectx "github.com/NARUBROWN/spine/pkg/spine"
 )
 
 type securityRequest struct {
@@ -47,30 +51,32 @@ type securityController struct {
 
 func (c *securityController) Create(_ *securityRequest, ctx spine.Ctx) httpx.Response[securityResponse] {
 	c.calls.Add(1)
-	marker, _ := ctx.Get("security-test-marker")
+	marker, _ := ctx.ExecutionContext().Get("security-test-marker")
 	value, _ := marker.(string)
 	return httpx.Response[securityResponse]{Body: securityResponse{Marker: value}}
 }
 
 type securityMarkerInterceptor struct{}
 
-func (*securityMarkerInterceptor) PreHandle(ctx core.ExecutionContext, _ core.HandlerMeta) error {
-	ctx.Set("security-test-marker", ctx.Header("X-Test-Marker"))
+func (*securityMarkerInterceptor) PreHandle(ctx spinectx.Ctx, _ core.HandlerMeta) error {
+	ctx.ExecutionContext().Set("security-test-marker", httpRequest(ctx).Header("X-Test-Marker"))
 	return nil
 }
-func (*securityMarkerInterceptor) PostHandle(core.ExecutionContext, core.HandlerMeta) {}
-func (*securityMarkerInterceptor) BeforeResponse(core.ExecutionContext, core.HandlerMeta, error) error {
+func (*securityMarkerInterceptor) PostHandle(spinectx.Ctx, core.HandlerMeta) {}
+func (*securityMarkerInterceptor) BeforeResponse(spinectx.Ctx, core.HandlerMeta, error) error {
 	return nil
 }
-func (*securityMarkerInterceptor) AfterCompletion(core.ExecutionContext, core.HandlerMeta, error) {}
+func (*securityMarkerInterceptor) AfterCompletion(spinectx.Ctx, core.HandlerMeta, error) {}
 
 func TestSecurityPipeline(t *testing.T) {
 	var calls atomic.Int64
 	app := platform.New()
-	app.Constructor(func() *securityController { return &securityController{calls: &calls} })
-	app.Route("POST", "/protected", (*securityController).Create, route.WithInterceptors(
-		&SecurityTokenInterceptor{Token: "test-token"}, &securityMarkerInterceptor{},
-	))
+	app.Constructor(
+		func() *securityController { return &securityController{calls: &calls} },
+		func() *SecurityTokenInterceptor { return &SecurityTokenInterceptor{Token: "test-token"} },
+		func() *securityMarkerInterceptor { return &securityMarkerInterceptor{} },
+	)
+
 	prepared, err := app.Prepare(context.Background(), boot.Options{HTTP: &boot.HTTPOptions{MaxBodyBytes: 64}})
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +88,10 @@ func TestSecurityPipeline(t *testing.T) {
 			t.Errorf("Close: %v", err)
 		}
 	})
-	handler := prepared.Handler()
+	handler, err := appspine.NetHTTPHandler(prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name, authorization, body string
@@ -148,4 +157,10 @@ func TestSecurityPipeline(t *testing.T) {
 			t.Fatalf("controller calls = %d, want %d", got, requests)
 		}
 	})
+}
+
+func (c *securityController) RegisterRoutes(r *api.Registry) {
+	r.POST("/protected", func(a input.Body[securityRequest], ctx spine.Ctx) httpx.Response[securityResponse] {
+		return c.Create((*securityRequest)(a), ctx)
+	}, api.Interceptors((*SecurityTokenInterceptor)(nil), (*securityMarkerInterceptor)(nil)))
 }
