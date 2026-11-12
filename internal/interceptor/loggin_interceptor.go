@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/NARUBROWN/spine/core"
+	spinectx "github.com/NARUBROWN/spine/pkg/spine"
 )
 
 type LoggingInterceptor struct{}
@@ -18,41 +19,41 @@ const (
 	startedAtKey = "request_started_at"
 )
 
-func (i *LoggingInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
-	requestID := requestID(ctx.Header("X-Request-ID"))
-	ctx.Set(requestIDKey, requestID)
-	ctx.Set(startedAtKey, time.Now())
+func (i *LoggingInterceptor) PreHandle(ctx spinectx.Ctx, meta core.HandlerMeta) error {
+	requestID := requestID(httpRequest(ctx).Header("X-Request-ID"))
+	ctx.ExecutionContext().Set(requestIDKey, requestID)
+	ctx.ExecutionContext().Set(startedAtKey, time.Now())
 	log.Printf(
 		"request started request_id=%s method=%s path=%s",
 		requestID,
-		ctx.Method(),
-		ctx.Path(),
+		httpRequest(ctx).Method(),
+		httpRequest(ctx).Path(),
 	)
 	return nil
 }
 
-func (i *LoggingInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {
+func (i *LoggingInterceptor) PostHandle(ctx spinectx.Ctx, meta core.HandlerMeta) {
 	controllerName := "<unresolved>"
 	methodName := "<unresolved>"
 	if meta.ControllerType != nil {
 		controllerName = meta.ControllerType.String()
 	}
-	if meta.Method.Name != "" {
-		methodName = meta.Method.Name
+	if meta.MethodName != "" {
+		methodName = meta.MethodName
 	}
 
 	log.Printf(
 		"handler completed request_id=%s method=%s path=%s handler=%s.%s",
 		contextString(ctx, requestIDKey, "unknown"),
-		ctx.Method(),
-		ctx.Path(),
+		httpRequest(ctx).Method(),
+		httpRequest(ctx).Path(),
 		controllerName,
 		methodName,
 	)
 }
 
 func (i *LoggingInterceptor) BeforeResponse(
-	ctx core.ExecutionContext,
+	ctx spinectx.Ctx,
 	meta core.HandlerMeta,
 	executionErr error,
 ) error {
@@ -60,7 +61,7 @@ func (i *LoggingInterceptor) BeforeResponse(
 }
 
 func (i *LoggingInterceptor) AfterCompletion(
-	ctx core.ExecutionContext,
+	ctx spinectx.Ctx,
 	meta core.HandlerMeta,
 	err error,
 ) {
@@ -68,8 +69,8 @@ func (i *LoggingInterceptor) AfterCompletion(
 		log.Printf(
 			"request failed request_id=%s method=%s path=%s duration=%s error=%v",
 			contextString(ctx, requestIDKey, "unknown"),
-			ctx.Method(),
-			ctx.Path(),
+			httpRequest(ctx).Method(),
+			httpRequest(ctx).Path(),
 			duration(ctx),
 			err,
 		)
@@ -78,8 +79,8 @@ func (i *LoggingInterceptor) AfterCompletion(
 	log.Printf(
 		"request completed request_id=%s method=%s path=%s duration=%s",
 		contextString(ctx, requestIDKey, "unknown"),
-		ctx.Method(),
-		ctx.Path(),
+		httpRequest(ctx).Method(),
+		httpRequest(ctx).Path(),
 		duration(ctx),
 	)
 }
@@ -96,8 +97,8 @@ func requestID(candidate string) string {
 	return "unavailable"
 }
 
-func contextString(ctx core.ExecutionContext, key string, fallback string) string {
-	value, ok := ctx.Get(key)
+func contextString(ctx spinectx.Ctx, key string, fallback string) string {
+	value, ok := ctx.ExecutionContext().Get(key)
 	if !ok {
 		return fallback
 	}
@@ -108,8 +109,8 @@ func contextString(ctx core.ExecutionContext, key string, fallback string) strin
 	return result
 }
 
-func duration(ctx core.ExecutionContext) time.Duration {
-	value, ok := ctx.Get(startedAtKey)
+func duration(ctx spinectx.Ctx) time.Duration {
+	value, ok := ctx.ExecutionContext().Get(startedAtKey)
 	if !ok {
 		return 0
 	}
@@ -119,3 +120,13 @@ func duration(ctx core.ExecutionContext) time.Duration {
 	}
 	return time.Since(startedAt).Round(time.Microsecond)
 }
+
+func httpRequest(ctx spinectx.Ctx) spinectx.HTTPRequestView {
+	request, ok := ctx.HTTPRequestContext()
+	if !ok {
+		panic("HTTP interceptor requires an HTTP request context")
+	}
+	return request
+}
+
+func (*LoggingInterceptor) Constructor() *LoggingInterceptor { return &LoggingInterceptor{} }

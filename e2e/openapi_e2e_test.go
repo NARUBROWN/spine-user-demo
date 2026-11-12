@@ -39,8 +39,8 @@ func TestRuntimeOpenAPIIncludesValidatedDTOs(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, diagnostic := range document.Diagnostics {
-		if diagnostic.Code != "RESPONSE_STATUS_DYNAMIC" && !(diagnostic.Code == "FIELD_EXAMPLE_VALIDATION_UNRESOLVED" && diagnostic.Target == "dto.CreateUserRequest.email") {
-			t.Fatalf("unexpected schema diagnostic: %s", diagnostic.Code)
+		if diagnostic.Code != "RESPONSE_STATUS_DYNAMIC" && !(diagnostic.Code == "FIELD_EXAMPLE_VALIDATION_UNRESOLVED" && (diagnostic.Target == "dto.CreateUserRequest.Email" || diagnostic.Target == "dto.CreateUserRequest.email")) {
+			t.Fatalf("unexpected schema diagnostic: %+v", diagnostic)
 		}
 	}
 	for _, method := range []string{"get", "post", "put", "delete"} {

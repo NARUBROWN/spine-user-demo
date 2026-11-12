@@ -1,6 +1,6 @@
 {
   "schema_version": "spine.example-channels/v1",
-  "cli_version": "v0.4.3-preview.3.0.20261105071512-903c5aa6ab92",
+  "cli_version": "v0.4.4",
   "modules": [
     "."
   ],

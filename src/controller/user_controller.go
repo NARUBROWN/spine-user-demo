@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/NARUBROWN/spine/pkg/api"
-	"github.com/NARUBROWN/spine/pkg/input"
-	spineroute "github.com/NARUBROWN/spine/pkg/route"
+
 	"net/http"
 	"os"
 	"spine-user-demo/internal/interceptor"
@@ -14,8 +12,10 @@ import (
 	"spine-user-demo/src/dto"
 	"spine-user-demo/src/service"
 
+	"github.com/NARUBROWN/spine/pkg/api"
 	"github.com/NARUBROWN/spine/pkg/httperr"
 	"github.com/NARUBROWN/spine/pkg/httpx"
+	"github.com/NARUBROWN/spine/pkg/input"
 	"github.com/NARUBROWN/spine/pkg/spine"
 	"github.com/uptrace/bun"
 )
@@ -42,7 +42,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		return
 	}
 	users := r.Group("/users", api.Tags("Users"))
-	users.GET("/", api.Options(api.Summary("사용자 조회")), func(
+	users.GET("/", func(
 		ctx context.Context,
 		q input.Query[dto.UserQuery],
 	) (httpx.Response[dto.CreateUserResponse], error) {
@@ -59,8 +59,8 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		return httpx.Response[dto.CreateUserResponse]{
 			Body: user,
 		}, nil
-	})
-	users.POST("/", api.Options(api.Summary("사용자 생성")), func(
+	}, api.Summary("사용자 조회"))
+	users.POST("/", func(
 		ctx context.Context,
 		req input.Body[dto.CreateUserRequest],
 		spineCtx spine.Ctx,
@@ -79,8 +79,8 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		return httpx.Response[dto.CreateUserResponse]{
 			Body: user,
 		}, nil
-	})
-	users.PUT("/", api.Options(api.Summary("사용자 수정")), func(
+	}, api.Summary("사용자 생성"))
+	users.PUT("/", func(
 		ctx context.Context,
 		q input.Query[dto.UserQuery],
 		req input.Body[dto.UpdateUserRequest],
@@ -106,8 +106,8 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		return httpx.Response[dto.CreateUserResponse]{
 			Body: user,
 		}, nil
-	})
-	users.DELETE("/", api.Options(api.Summary("사용자 삭제")), func(
+	}, api.Summary("사용자 수정"))
+	users.DELETE("/", func(
 		ctx context.Context,
 		q input.Query[dto.UserQuery],
 		spineCtx spine.Ctx,
@@ -124,7 +124,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 			return mapServiceError(err)
 		}
 		return nil
-	})
+	}, api.Summary("사용자 삭제"))
 	if os.Getenv("SPINE_DEMO_ENABLE_FAILURE_SCENARIOS") == "1" {
 		r.POST("/scenarios/transactions/controller-error", func(
 			ctx context.Context,
@@ -168,8 +168,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 		})
 	}
 	if os.Getenv("SPINE_DEMO_ENABLE_SECURITY_SCENARIOS") == "1" {
-		token := os.Getenv("SPINE_DEMO_SECURITY_TOKEN")
-		if token == "" {
+		if os.Getenv("SPINE_DEMO_SECURITY_TOKEN") == "" {
 			r.Error(fmt.Errorf("SPINE_DEMO_SECURITY_TOKEN is required for security scenarios"))
 			return
 		}
@@ -192,12 +191,12 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 			return httpx.Response[dto.CreateUserResponse]{
 				Body: user,
 			}, nil
-		}, spineroute.WithInterceptors(&interceptor.SecurityTokenInterceptor{Token: token}))
+		}, api.Interceptors((*interceptor.SecurityTokenInterceptor)(nil)))
 	}
 }
 
 func transactionFrom(spineCtx spine.Ctx) (bun.IDB, error) {
-	v, exists := spineCtx.Get("tx")
+	v, exists := spineCtx.ExecutionContext().Get("tx")
 	if !exists {
 		return nil, httperr.InternalServerError("트랜잭션이 존재하지 않습니다.")
 	}
