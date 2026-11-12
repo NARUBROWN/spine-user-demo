@@ -14,16 +14,16 @@ import (
 func ValidateEnvironment() error {
 	dsn := os.Getenv("SPINE_DEMO_MYSQL_DSN")
 	if dsn == "" {
-		return boot.ValidationError(boot.ConfigIssue{
+		return &boot.ConfigError{Issues: []boot.ConfigIssue{{
 			Path: "Environment.SPINE_DEMO_MYSQL_DSN", Code: "REQUIRED",
 			Message: "MySQL DSN is required", Hint: "Set SPINE_DEMO_MYSQL_DSN before starting the application",
-		})
+		}}}
 	}
 	if _, err := mysql.ParseDSN(dsn); err != nil {
-		return boot.ValidationError(boot.ConfigIssue{
+		return &boot.ConfigError{Issues: []boot.ConfigIssue{{
 			Path: "Environment.SPINE_DEMO_MYSQL_DSN", Code: "INVALID_DSN",
 			Message: "MySQL DSN is invalid", Hint: "Use a go-sql-driver/mysql compatible DSN",
-		})
+		}}}
 	}
 	return nil
 }

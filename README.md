@@ -1,6 +1,6 @@
 # spine-user-demo
 
-Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + Swagger).
+Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + 내장 OpenAPI).
 
 **[Spine CLI](https://github.com/NARUBROWN/spine-cli)로 빌드하고 검증한 예제입니다.**
 Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
@@ -41,7 +41,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 예제는 Spine `v0.6.5`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 예제는 Spine `v0.7.5`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -51,13 +51,25 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 - HTTP 범위 인터셉터가 요청 ID와 처리 시간을 영문 로그로 남깁니다. 유효한 `X-Request-ID`가 있으면 이어서 사용합니다.
 - 성공 응답은 커밋하고 컨트롤러 오류와 응답 준비 오류는 롤백하는 경계를 Docker E2E로 검증합니다.
 
+`constructor`는 `github.com/NARUBROWN/spine/pkg/constructor` 패키지입니다. 사용자 정의를 포함한 다섯 역할을 하나의 `app.Constructor(...)` 호출에 모으며 같은 DI 컨테이너를 공유합니다. `constructor.Controller`는 생성 메서드와 `RegisterRoutes`를, `constructor.Interceptor`는 생성 메서드와 기존 인터셉터 계약을 검사합니다. 인터셉터 적용은 기존 `InterceptorFor`로 지정합니다. 공개된 정식 모듈로 검증합니다.
+
+```go
+app.Constructor(
+    constructor.Custom(database.NewBunDB),
+    constructor.Repository(&repository.UserRepository{}),
+    constructor.Service(&service.UserService{}),
+    constructor.Controller(&controller.UserController{}),
+    constructor.Interceptor(&interceptor.TxInterceptor{}),
+)
+```
+
 생성자 의존성 예시 (Repository -> Service):
 ```go
 type UserRepository struct {
     db bun.IDB
 }
 
-func NewUserRepository(db *bun.DB) *UserRepository {
+func (*UserRepository) Constructor(db *bun.DB) *UserRepository {
     return &UserRepository{db: db}
 }
 
@@ -65,44 +77,48 @@ type UserService struct {
     repo userRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
     return &UserService{repo: repo}
 }
 ```
 
 핵심 특징:
-- 컨테이너에 등록될 컴포넌트는 **생성자 함수**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다.
-- Controller는 `context.Context`, `query.Values`, DTO를 조합해 입력을 받습니다.
-- Query는 `query.Values`로 **가변 파라미터**를 받고, 필요 시 직접 해석할 수 있습니다.
+- 객체 표식으로 등록하는 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다. 외부 타입의 기존 생성자 함수는 `constructor.Custom(NewX)`로 등록할 수 있습니다.
+- Controller는 `context.Context`, 쿼리 구조체 포인터와 본문 DTO를 조합해 입력을 받습니다.
+- `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 playground가 필수값과 양수 여부를 검사합니다.
 - Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
 
 예시:
 ```go
-func (c *UserController) GetUser(
-    ctx context.Context,
-    q query.Values,
-) (httpx.Response[dto.CreateUserResponse], error) {
-    userId := int(q.Int("id", 0))
+type UserQuery struct { ID *int64 `validate:"required,gt=0"` }
 
-    user, err := c.userService.Get(ctx, userId)
-    if err != nil {
-        return httpx.Response[dto.CreateUserResponse]{}, httperr.NotFound("유저를 찾을 수 없습니다.")
-    }
-
-    return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
+func (c *UserController) RegisterRoutes(r *api.Registry) {
+    r.GET("/users", func(ctx context.Context, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
+        userId := (*q).UserID()
+        if userId <= 0 {
+            return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
+        }
+        user, err := c.userService.Get(ctx, userId)
+        if err != nil {
+            return httpx.Response[dto.CreateUserResponse]{}, mapServiceError(err)
+        }
+        return httpx.Response[dto.CreateUserResponse]{Body: user}, nil
+    })
 }
 ```
+
+숫자 변환에 실패하거나 범위를 넘는 ID는 바인딩 단계에서 HTTP 400으로 거부됩니다. 같은 `id`를 여러 번 전달하는 요청도 HTTP 400으로 거부합니다. 이전 `query.Values`는 첫 번째 값만 사용했습니다.
 
 DTO 예시:
 ```go
 type CreateUserRequest struct {
     ID    int    `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    Name  string `json:"name" validate:"required,max=100"`
+    Email string `json:"email" validate:"required,email,max=255"`
 }
 
 type UpdateUserRequest struct {
-    Name  string `json:"name"`
+    Name  string `json:"name" validate:"required,max=100"`
     Email string `json:"email"`
 }
 
@@ -118,126 +134,251 @@ type CreateUserResponse struct {
 - 아래는 요청/응답 로깅을 위한 사용자 구현 예시입니다.
 
 ```go
+package interceptor
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"log"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/NARUBROWN/spine/core"
+	spinectx "github.com/NARUBROWN/spine/pkg/spine"
+)
+
 type LoggingInterceptor struct{}
 
-func (i *LoggingInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
-    log.Printf(
-        "[Logging Interceptor][REQ] %s %s",
-        ctx.Method(),
-        ctx.Path(),
-    )
-    return nil
+const (
+	requestIDKey = "request_id"
+	startedAtKey = "request_started_at"
+)
+
+func (i *LoggingInterceptor) PreHandle(ctx spinectx.Ctx, meta core.HandlerMeta) error {
+	requestID := requestID(httpRequest(ctx).Header("X-Request-ID"))
+	ctx.ExecutionContext().Set(requestIDKey, requestID)
+	ctx.ExecutionContext().Set(startedAtKey, time.Now())
+	log.Printf(
+		"request started request_id=%s method=%s path=%s",
+		requestID,
+		httpRequest(ctx).Method(),
+		httpRequest(ctx).Path(),
+	)
+	return nil
 }
 
-func (i *LoggingInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {
-    controllerName := "<unresolved>"
-    methodName := "<unresolved>"
-    if meta.ControllerType != nil {
-        controllerName = meta.ControllerType.Name()
-    }
-    if meta.Method.Name != "" {
-        methodName = meta.Method.Name
-    }
+func (i *LoggingInterceptor) PostHandle(ctx spinectx.Ctx, meta core.HandlerMeta) {
+	controllerName := "<unresolved>"
+	methodName := "<unresolved>"
+	if meta.ControllerType != nil {
+		controllerName = meta.ControllerType.String()
+	}
+	if meta.MethodName != "" {
+		methodName = meta.MethodName
+	}
 
-    log.Printf(
-        "[Logging Interceptor][RES] %s %s -> %s.%s OK",
-        ctx.Method(),
-        ctx.Path(),
-        controllerName,
-        methodName,
-    )
+	log.Printf(
+		"handler completed request_id=%s method=%s path=%s handler=%s.%s",
+		contextString(ctx, requestIDKey, "unknown"),
+		httpRequest(ctx).Method(),
+		httpRequest(ctx).Path(),
+		controllerName,
+		methodName,
+	)
 }
 
-func (i *LoggingInterceptor) BeforeResponse(ctx core.ExecutionContext, meta core.HandlerMeta, executionErr error) error {
-    return nil
+func (i *LoggingInterceptor) BeforeResponse(
+	ctx spinectx.Ctx,
+	meta core.HandlerMeta,
+	executionErr error,
+) error {
+	return nil
 }
 
-func (i *LoggingInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
-    if err != nil {
-        log.Printf(
-            "[Logging Interceptor][ERR] %s %s : %v",
-            ctx.Method(),
-            ctx.Path(),
-            err,
-        )
-    }
+func (i *LoggingInterceptor) AfterCompletion(
+	ctx spinectx.Ctx,
+	meta core.HandlerMeta,
+	err error,
+) {
+	if err != nil {
+		log.Printf(
+			"request failed request_id=%s method=%s path=%s duration=%s error=%v",
+			contextString(ctx, requestIDKey, "unknown"),
+			httpRequest(ctx).Method(),
+			httpRequest(ctx).Path(),
+			duration(ctx),
+			err,
+		)
+		return
+	}
+	log.Printf(
+		"request completed request_id=%s method=%s path=%s duration=%s",
+		contextString(ctx, requestIDKey, "unknown"),
+		httpRequest(ctx).Method(),
+		httpRequest(ctx).Path(),
+		duration(ctx),
+	)
 }
+
+func requestID(candidate string) string {
+	candidate = strings.TrimSpace(candidate)
+	if candidate != "" && len(candidate) <= 128 && strings.IndexFunc(candidate, unicode.IsControl) == -1 {
+		return candidate
+	}
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err == nil {
+		return hex.EncodeToString(raw[:])
+	}
+	return "unavailable"
+}
+
+func contextString(ctx spinectx.Ctx, key string, fallback string) string {
+	value, ok := ctx.ExecutionContext().Get(key)
+	if !ok {
+		return fallback
+	}
+	result, ok := value.(string)
+	if !ok {
+		return fallback
+	}
+	return result
+}
+
+func duration(ctx spinectx.Ctx) time.Duration {
+	value, ok := ctx.ExecutionContext().Get(startedAtKey)
+	if !ok {
+		return 0
+	}
+	startedAt, ok := value.(time.Time)
+	if !ok {
+		return 0
+	}
+	return time.Since(startedAt).Round(time.Microsecond)
+}
+
+func httpRequest(ctx spinectx.Ctx) spinectx.HTTPRequestView {
+	request, ok := ctx.HTTPRequestContext()
+	if !ok {
+		panic("HTTP interceptor requires an HTTP request context")
+	}
+	return request
+}
+
+func (*LoggingInterceptor) Constructor() *LoggingInterceptor { return &LoggingInterceptor{} }
 ```
 
 Tx 인터셉터 예시:
 ```go
-func (i *TxInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
-    reqCtx := ctx.Context()
-    if reqCtx == nil {
-        return errors.New("execution context has no request context")
-    }
+package interceptor
 
-    tx, err := i.db.BeginTx(reqCtx, nil)
-    if err != nil {
-        return err
-    }
+import (
+	"errors"
 
-    ctx.Set("tx", tx)
-    return nil
+	"github.com/NARUBROWN/spine/core"
+	spinectx "github.com/NARUBROWN/spine/pkg/spine"
+	"github.com/uptrace/bun"
+)
+
+type TxInterceptor struct {
+	db *bun.DB
 }
 
-func (i *TxInterceptor) BeforeResponse(ctx core.ExecutionContext, meta core.HandlerMeta, executionErr error) error {
-    v, ok := ctx.Get("tx")
-    if !ok {
-        return nil
-    }
-
-    tx, ok := v.(bun.Tx)
-    if !ok {
-        return errors.New("execution context has an invalid transaction")
-    }
-
-    if executionErr != nil {
-        return tx.Rollback()
-    }
-
-    return tx.Commit()
+func (*TxInterceptor) Constructor(db *bun.DB) *TxInterceptor {
+	return &TxInterceptor{db: db}
 }
 
-func (i *TxInterceptor) AfterCompletion(ctx core.ExecutionContext, meta core.HandlerMeta, err error) {
+func (i *TxInterceptor) PreHandle(ctx spinectx.Ctx, meta core.HandlerMeta) error {
+	reqCtx := ctx.ExecutionContext().Context()
+	if reqCtx == nil {
+		return errors.New("execution context has no request context")
+	}
+
+	tx, err := i.db.BeginTx(reqCtx, nil)
+	if err != nil {
+		return err
+	}
+
+	// ExecutionContext에 tx 저장
+	ctx.ExecutionContext().Set("tx", tx)
+	return nil
+}
+
+func (i *TxInterceptor) PostHandle(ctx spinectx.Ctx, meta core.HandlerMeta) {}
+
+func (i *TxInterceptor) BeforeResponse(
+	ctx spinectx.Ctx,
+	meta core.HandlerMeta,
+	executionErr error,
+) error {
+	v, ok := ctx.ExecutionContext().Get("tx")
+	if !ok {
+		return nil
+	}
+
+	tx, ok := v.(bun.Tx)
+	if !ok {
+		return errors.New("execution context has an invalid transaction")
+	}
+
+	if executionErr != nil {
+		return tx.Rollback()
+	}
+
+	return tx.Commit()
+}
+
+func (i *TxInterceptor) AfterCompletion(
+	ctx spinectx.Ctx,
+	meta core.HandlerMeta,
+	err error,
+) {
 }
 ```
+
+모든 인터셉터는 `app.Constructor`에 등록하고 typed nil로 컨테이너에서 조회합니다. CORS 팩토리는 `constructor.Custom`으로 등록합니다.
 
 등록 예시:
 ```go
-app.InterceptorFor(
-    boot.InterceptorHTTP,
-    cors.New(cors.Config{
-        AllowOrigins: []string{"*"},
-        AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowHeaders: []string{"Content-Type"},
-    }),
-    (*interceptor.TxInterceptor)(nil),
-    &interceptor.LoggingInterceptor{},
-)
+app.Constructor(
+		constructor.Custom(database.NewBunDB),
+		constructor.Repository(&repository.UserRepository{}),
+		constructor.Service(&service.UserService{}),
+		constructor.Controller(&controller.UserController{}),
+		constructor.Interceptor(&interceptor.TxInterceptor{}),
+		constructor.Interceptor(&interceptor.LoggingInterceptor{}),
+		constructor.Interceptor(&interceptor.SecurityTokenInterceptor{}),
+		constructor.Custom(interceptor.NewCORSInterceptor),
+	)
+	app.InterceptorFor(boot.InterceptorHTTP,
+		(*cors.CORSInterceptor)(nil),
+		(*interceptor.TxInterceptor)(nil),
+		(*interceptor.LoggingInterceptor)(nil),
+	)
 ```
 
 ## 권장 환경
-- 최소 Go 버전: 1.25.5
+- 최소 Go 버전: 1.26.0 (playground 검증기 의존성)
 - 검증한 Go 버전: 1.26.0
 
 ## Spine CLI 프로젝트 구조
 
-공개 Spine CLI `v0.4.2`의 플랫폼 조립 방식과 Spine `v0.6.5`에 맞춰 기존 API와 처리 로직을 구성했습니다.
-Go `1.25.5` 이상에서 다음 명령으로 같은 CLI를 설치할 수 있습니다. 이번 검증에는 Go `1.26.0`을 사용했습니다.
+Spine CLI v0.4.4의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
+이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI v0.4.4를 설치할 수 있습니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.2
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.4
 spine version
-# spine-cli 0.4.2
 ```
 
-HTTP 앱은 Spine `v0.6.5`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합니다.
+CLI는 정식 버전 `v0.4.4`를 설치합니다. CI 검증 버전도 `.github/example-channels.json`에 고정합니다.
+
+HTTP 앱은 Spine `v0.7.5`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
 `spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
 만든 뼈대에 기존 Bun CRUD, 검증, 오류 매핑과 트랜잭션 처리를 옮겼습니다.
-`spine g route`로 기존 HTTP 메서드와 경로를 명시적으로 등록했습니다.
+HTTP 메서드와 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
 
 ```text
 .
@@ -252,20 +393,18 @@ HTTP 앱은 Spine `v0.6.5`, Echo 플랫폼 `v0.1.0`, Echo `v5.4.4`를 사용합�
 │   ├── controller/                # 사용자 HTTP 핸들러
 │   ├── service/                   # CRUD와 오류 매핑
 │   ├── repository/                # Bun 쿼리
-│   ├── dto/                       # 요청, 응답과 입력 검증
-│   └── route/route.go             # 사용자 라우트와 선택적 실패 시나리오
+│   └── dto/                       # 요청, 응답과 입력 검증
 ├── migrations/                    # 기존 SQL과 마이그레이션 실행
-├── docs/                          # Swagger 문서
 ├── e2e/
 └── scripts/e2e.sh
 ```
 
-생성자는 `BuildApplication`에서 연결하고, HTTP 경로는 `route.Register(app)`로 등록합니다.
-`spine.New(echoplatform.Option(echoplatform.WithEcho(...)))`가 Echo v5 플랫폼과 기존 `/swagger/*` 경로를 구성합니다.
+생성자는 `BuildApplication`에서 역할별로 연결하고, HTTP 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
+`spine.New(echoplatform.Option(), spine.WithValidator(validator))`로 Echo v5 플랫폼과 playground를 선택하며, 내장 OpenAPI 명세와 UI는 `boot.HTTPOptions.OpenAPI`로 설정합니다.
 `BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
 
-`spine.toml`에는 `recipe = "platform-contracts-v0.6.5"`, `websocket_platform = "none"`,
-`validator = "none"`을 기록합니다. 기존 DTO 검증과 HTTP 오류 처리를 유지하며 별도 검증기는 선택하지 않습니다.
+`spine.toml`에는 `recipe = "platform-contracts-preview"`, `websocket_platform = "none"`,
+`validator = "playground"`를 기록합니다. `BuildApplication`에서 만든 검증기를 실제 요청 검증과 명세 생성에 함께 사용합니다.
 `spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
 
 ```sh
@@ -320,7 +459,7 @@ HTTP 기본 panic 복구가 활성화됩니다. 테스트 라우트는 SPINE_DEM
    # 또는 spine run / go run .
    ```
 5. 서버 주소: `http://localhost:8080`
-6. Swagger UI: `http://localhost:8080/swagger/index.html`
+6. 내장 API UI: `http://localhost:8080/docs`, OpenAPI JSON: `http://localhost:8080/openapi.json`
 
 ## 간단한 호출 예시
 - 조회
@@ -370,9 +509,9 @@ E2E는 다음 경계를 실제 MySQL 행 수로 확인합니다.
 - 선택적 보호 라우트의 인증 실패 시 사용자 행이 추가되지 않음
 - 인증되지 않은 잘못된 본문은 바인딩 전에 거부되고, 유효한 인증의 잘못된 본문은 400으로 처리됨
 
-컨트롤러·응답 오류 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다.
+컨트롤러, 응답 오류 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다.
 
-보안 검증용 `POST /scenarios/security/users`는 `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1`과 비어 있지 않은 `SPINE_DEMO_SECURITY_TOKEN`을 함께 지정해야 등록됩니다. `Authorization: Bearer <토큰>`을 검사하고, 본문 처리는 인증 성공 후에 진행합니다. 이 토큰은 테스트용 공유 자격 증명이며 사용자별 인증·인가 예제는 아닙니다. 기존 `/users` 경로에는 이 인증이 적용되지 않습니다. E2E 스크립트는 격리된 로컬 실행에만 사용할 임시 테스트 토큰을 설정합니다.
+보안 검증용 `POST /scenarios/security/users`는 `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1`과 비어 있지 않은 `SPINE_DEMO_SECURITY_TOKEN`을 함께 지정해야 등록됩니다. `Authorization: Bearer <토큰>`을 검사하고, 본문 처리는 인증 성공 후에 진행합니다. 이 토큰은 테스트용 공유 자격 증명이며 사용자별 인증, 인가 예제는 아닙니다. 기존 `/users` 경로에는 이 인증이 적용되지 않습니다. E2E 스크립트는 격리된 로컬 실행에만 사용할 임시 테스트 토큰을 설정합니다.
 
 `internal/interceptor`의 HTTP 파이프라인 테스트는 인증 실패와 잘못된 본문에서 컨트롤러 미실행, 작은 본문 제한의 적용, 동시 요청의 컨텍스트 격리를 검사합니다. 해당 테스트는 MySQL 없이 Spine과 Echo 플랫폼의 `Prepare` 경로를 사용합니다. 직접 외부 인프라에 연결해 E2E를 실행할 때는 서버에도 보안 시나리오 활성화 변수와 토큰을 지정한 뒤 다음 환경 변수를 사용합니다.
 
@@ -384,3 +523,60 @@ go test -tags=e2e -v ./e2e
 ```
 
 스크립트는 종료할 때 테스트 서버와 MySQL 컨테이너 및 볼륨을 정리합니다. 별도 포트가 필요하면 `SPINE_DEMO_E2E_MYSQL_PORT`와 `SPINE_DEMO_E2E_HTTP_PORT`를 설정할 수 있습니다.
+
+## 컨트롤러 경로 등록
+
+이 예제는 공개된 Spine `v0.7.5`의 `api.Controller.RegisterRoutes`를 사용합니다. 기본 User 앱과 기존 DB를 자동으로 이전하거나 재기동하지 않습니다.
+
+`src/controller/user_controller.go`가 CRUD 경로와 콜백을 함께 선언하고 `internal/application`은 구체 생성자를 등록합니다. 별도 src/route/route.go는 사용하지 않습니다. Query와 Body는 `input.Query[dto.UserQuery]`, `input.Body[dto.CreateUserRequest]` 등으로 받으며 기존 DTO 정규화와 검증, 트랜잭션, 오류 응답 및 선택적 실패와 보안 시나리오를 유지합니다.
+
+준비 전 `spine.DescribeHTTP`는 생성자를 실행하지 않고 ErrRoutesNotCollected를 반환합니다. CLI 정적 내보내기를 사용하거나, 앱을 명시적으로 Prepare한 뒤 DescribePreparedHTTP를 조회하세요. DB와 브로커 초기화는 명시한 준비 과정의 일부입니다.
+
+## 내장 OpenAPI와 API UI
+
+외부 명세 생성기의 의존성, 주석과 생성 스냅샷을 제거했습니다. 앱을 준비할 때 실제 등록에서 OpenAPI 3.1 명세를 생성하고 메모리에 보관합니다. UI와 정적 파일도 Spine 패키지에서 제공하며 별도 Echo 핸들러나 외부 CDN이 필요하지 않습니다.
+
+```go
+validator, err := playground.New()
+if err != nil {
+    return nil, boot.Options{}, err
+}
+app := spine.New(echoplatform.Option(), spine.WithValidator(validator))
+
+options := boot.Options{
+    HTTP: &boot.HTTPOptions{
+        OpenAPI: boot.OpenAPIOptions{
+            Enabled: true,
+            Title: "Spine User Demo API",
+            Version: "0.2.0",
+            UI: []boot.OpenAPIUI{
+                swaggerui.New(swaggerui.Options{Title: "Spine User Demo API"}),
+            },
+        },
+    },
+}
+```
+
+`playground`는 `github.com/NARUBROWN/spine-validator-playground`, `swaggerui`는 `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`에서 가져옵니다. JSON은 `/openapi.json`, UI는 `/docs`입니다. 이전 `/swagger/*` 경로는 제공하지 않습니다.
+
+런타임 명세에는 쿼리 `id`, 생성과 수정 요청 본문, `CreateUserResponse`, HTTP 400 오류 구조가 포함됩니다. DTO의 `validate` 태그에서 다음 제약을 읽으며, 같은 검증기가 핸들러 실행 전 요청을 검사합니다.
+
+| 입력 | 검증과 명세 |
+| --- | --- |
+| 쿼리 `id` | 필수 정수, `0` 초과 |
+| 생성과 수정의 `name` | 필수 문자열, 최대 100자 |
+| 생성의 `email` | 필수 문자열, 이메일 형식, 최대 255자 |
+
+태그 검증은 원본 입력에 적용됩니다. 기존 수동 `Validate()`는 그 뒤 문자열 정리, 공백뿐인 이름 거부, 이메일 바이트 길이와 `net/mail` 검사를 유지합니다. 따라서 앞뒤 공백이 있는 이메일이나 정리 전 100자를 넘는 이름은 태그 검증에서 HTTP 400으로 거부됩니다. 생성 요청의 `id`는 DB가 발급하므로 사용하지 않으며, 수정 요청의 `email`도 변경하지 않습니다.
+
+필드 검증 오류는 HTTP 400 응답의 `fields`에 입력 위치, JSON Pointer와 실패 규칙을 담습니다. 정적 명세가 필요하면 다음 명령으로 별도 내보낼 수 있습니다.
+
+```sh
+spine contract export --format openapi --source static --output openapi.json
+```
+
+수동 `Validate()`의 추가 규칙, 동적 상태 코드와 인증 정책은 자동 추론하지 않습니다. 응답 DTO는 `default` 응답에 표시되며, `404`와 `409` 같은 업무 오류를 개별 응답으로 추정하지 않습니다.
+
+## 정식 의존성
+
+Spine `v0.7.5`, CLI `v0.4.4`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `main`로 지정합니다.

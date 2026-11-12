@@ -34,3 +34,17 @@ func TestApplicationAddressPrecedence(t *testing.T) {
 		t.Fatalf("explicit address = %q, error = %v", options.Address, err)
 	}
 }
+
+func TestBuildApplicationConfiguresNativeOpenAPI(t *testing.T) {
+	t.Setenv("SPINE_DEMO_MYSQL_DSN", "")
+	app, options, err := BuildApplication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.HTTP == nil || !options.HTTP.OpenAPI.Enabled || options.HTTP.OpenAPI.Path != "/openapi.json" || len(options.HTTP.OpenAPI.UI) != 1 {
+		t.Fatalf("OpenAPI options: %+v", options.HTTP)
+	}
+	if err = app.Validate(options); err != nil {
+		t.Fatal(err)
+	}
+}

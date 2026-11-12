@@ -13,7 +13,7 @@ type UserRepository struct {
 	db bun.IDB
 }
 
-func NewUserRepository(db *bun.DB) *UserRepository {
+func (*UserRepository) Constructor(db *bun.DB) *UserRepository {
 	return &UserRepository{
 		db: db,
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NARUBROWN/spine/core"
+	spinectx "github.com/NARUBROWN/spine/pkg/spine"
 	"github.com/uptrace/bun"
 )
 
@@ -11,12 +12,12 @@ type TxInterceptor struct {
 	db *bun.DB
 }
 
-func NewTxInterceptor(db *bun.DB) *TxInterceptor {
+func (*TxInterceptor) Constructor(db *bun.DB) *TxInterceptor {
 	return &TxInterceptor{db: db}
 }
 
-func (i *TxInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMeta) error {
-	reqCtx := ctx.Context()
+func (i *TxInterceptor) PreHandle(ctx spinectx.Ctx, meta core.HandlerMeta) error {
+	reqCtx := ctx.ExecutionContext().Context()
 	if reqCtx == nil {
 		return errors.New("execution context has no request context")
 	}
@@ -27,18 +28,18 @@ func (i *TxInterceptor) PreHandle(ctx core.ExecutionContext, meta core.HandlerMe
 	}
 
 	// ExecutionContext에 tx 저장
-	ctx.Set("tx", tx)
+	ctx.ExecutionContext().Set("tx", tx)
 	return nil
 }
 
-func (i *TxInterceptor) PostHandle(ctx core.ExecutionContext, meta core.HandlerMeta) {}
+func (i *TxInterceptor) PostHandle(ctx spinectx.Ctx, meta core.HandlerMeta) {}
 
 func (i *TxInterceptor) BeforeResponse(
-	ctx core.ExecutionContext,
+	ctx spinectx.Ctx,
 	meta core.HandlerMeta,
 	executionErr error,
 ) error {
-	v, ok := ctx.Get("tx")
+	v, ok := ctx.ExecutionContext().Get("tx")
 	if !ok {
 		return nil
 	}
@@ -56,7 +57,7 @@ func (i *TxInterceptor) BeforeResponse(
 }
 
 func (i *TxInterceptor) AfterCompletion(
-	ctx core.ExecutionContext,
+	ctx spinectx.Ctx,
 	meta core.HandlerMeta,
 	err error,
 ) {
