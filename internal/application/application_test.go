@@ -1,12 +1,22 @@
 package application
 
-import "testing"
+import (
+	"errors"
+	"testing"
 
-func TestSecurityScenarioRequiresToken(t *testing.T) {
+	"github.com/NARUBROWN/spine/pkg/boot"
+)
+
+func TestSecurityScenarioRequiresTokenBeforeComposition(t *testing.T) {
 	t.Setenv("SPINE_DEMO_ENABLE_SECURITY_SCENARIOS", "1")
 	t.Setenv("SPINE_DEMO_SECURITY_TOKEN", "")
-	if _, _, err := BuildApplication(); err == nil {
-		t.Fatal("security scenario must reject an empty token")
+	_, _, err := BuildApplication()
+	var configurationError *boot.ConfigError
+	if !errors.As(err, &configurationError) {
+		t.Fatalf("expected configuration error, got %v", err)
+	}
+	if len(configurationError.Issues) != 1 || configurationError.Issues[0].Path != "Environment.SPINE_DEMO_SECURITY_TOKEN" {
+		t.Fatalf("unexpected issues: %+v", configurationError.Issues)
 	}
 }
 
