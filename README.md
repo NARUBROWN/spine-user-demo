@@ -363,15 +363,15 @@ app.Constructor(
 
 ## Spine CLI 프로젝트 구조
 
-Spine CLI v0.4.5-preview.4의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
-이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI v0.4.5-preview.4를 설치할 수 있습니다.
+Spine CLI v0.4.5-preview.5의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
+이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI v0.4.5-preview.5를 설치할 수 있습니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.5-preview.4
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.5-preview.5
 spine version
 ```
 
-CLI는 Preview 버전 `v0.4.5-preview.4`를 설치합니다. CI 검증 버전도 `.github/example-channels.json`에 고정합니다.
+CLI는 Preview 버전 `v0.4.5-preview.5`를 설치합니다. CI 검증 버전도 `.github/example-channels.json`에 고정합니다.
 
 HTTP 앱은 Spine `v0.7.6-preview.1`, Echo 플랫폼 `v0.2.1-preview.1`, playground 검증기 `v0.2.1-preview.1`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
@@ -579,4 +579,4 @@ spine contract export --format openapi --source static --output openapi.json
 
 ## 정식 의존성
 
-Spine `v0.7.6-preview.1`, CLI `v0.4.5-preview.4`, Echo 플랫폼 `v0.2.1-preview.1`, playground 검증기 `v0.2.1-preview.1`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `preview`로 지정합니다.
+Spine `v0.7.6-preview.1`, CLI `v0.4.5-preview.5`, Echo 플랫폼 `v0.2.1-preview.1`, playground 검증기 `v0.2.1-preview.1`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `preview`로 지정합니다.
