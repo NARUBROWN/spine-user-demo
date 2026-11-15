@@ -41,7 +41,7 @@ Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계�
 이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
 요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
 
-이 예제는 Spine `v0.7.5`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+이 예제는 Spine `v0.7.6-preview.1`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
 
 추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
 
@@ -363,17 +363,17 @@ app.Constructor(
 
 ## Spine CLI 프로젝트 구조
 
-Spine CLI v0.4.4의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
-이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI v0.4.4를 설치할 수 있습니다.
+Spine CLI v0.4.5-preview.5의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
+이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI v0.4.5-preview.5를 설치할 수 있습니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.4
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.5-preview.5
 spine version
 ```
 
-CLI는 정식 버전 `v0.4.4`를 설치합니다. CI 검증 버전도 `.github/example-channels.json`에 고정합니다.
+CLI는 Preview 버전 `v0.4.5-preview.5`를 설치합니다. CI 검증 버전도 `.github/example-channels.json`에 고정합니다.
 
-HTTP 앱은 Spine `v0.7.5`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`, Echo `v5.4.4`를 사용합니다.
+HTTP 앱은 Spine `v0.7.6-preview.1`, Echo 플랫폼 `v0.2.1-preview.1`, playground 검증기 `v0.2.1-preview.1`, Echo `v5.4.4`를 사용합니다.
 설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
 
 `spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
@@ -526,7 +526,7 @@ go test -tags=e2e -v ./e2e
 
 ## 컨트롤러 경로 등록
 
-이 예제는 공개된 Spine `v0.7.5`의 `api.Controller.RegisterRoutes`를 사용합니다. 기본 User 앱과 기존 DB를 자동으로 이전하거나 재기동하지 않습니다.
+이 예제는 공개된 Spine `v0.7.6-preview.1`의 `api.Controller.RegisterRoutes`를 사용합니다. 기본 User 앱과 기존 DB를 자동으로 이전하거나 재기동하지 않습니다.
 
 `src/controller/user_controller.go`가 CRUD 경로와 콜백을 함께 선언하고 `internal/application`은 구체 생성자를 등록합니다. 별도 src/route/route.go는 사용하지 않습니다. Query와 Body는 `input.Query[dto.UserQuery]`, `input.Body[dto.CreateUserRequest]` 등으로 받으며 기존 DTO 정규화와 검증, 트랜잭션, 오류 응답 및 선택적 실패와 보안 시나리오를 유지합니다.
 
@@ -579,4 +579,4 @@ spine contract export --format openapi --source static --output openapi.json
 
 ## 정식 의존성
 
-Spine `v0.7.5`, CLI `v0.4.4`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `main`로 지정합니다.
+Spine `v0.7.6-preview.1`, CLI `v0.4.5-preview.5`, Echo 플랫폼 `v0.2.1-preview.1`, playground 검증기 `v0.2.1-preview.1`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `preview`로 지정합니다.
