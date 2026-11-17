@@ -1,57 +1,53 @@
+English | [Korean](README.ko.md)
+
 # spine-user-demo
 
-Spine의 HTTP, DI, 요청 단위 트랜잭션 계약을 보여주는 사용자 CRUD 예제(Spine 프레임워크 + Bun ORM + 내장 OpenAPI).
+A user CRUD example demonstrating Spine's HTTP, dependency injection, and request-scoped transaction contracts with Bun ORM and built-in OpenAPI.
 
-**[Spine CLI](https://github.com/NARUBROWN/spine-cli)로 빌드하고 검증한 예제입니다.**
-Spine CLI로 개발 서버 실행, 코드 변경 감지와 자동 재빌드, 실행 계약 검사, 구성 요소 생성을 이어갈 수 있습니다.
-새로운 Spine 프로젝트를 만들거나 이 예제를 확장하려면 [Spine CLI의 명령과 사용 예제](https://github.com/NARUBROWN/spine-cli#readme)를 확인하세요.
+**Built and verified with [Spine CLI](https://github.com/NARUBROWN/spine-cli).** Use the CLI to run the development server, watch and rebuild code, check execution contracts, and generate components. See [CLI commands and examples](https://github.com/NARUBROWN/spine-cli#readme) to start or extend a project.
 
-## 예제 채널 선택
+## Example channels
 
-| 채널 | 브랜치 | 용도 |
+| Channel | Branch | Purpose |
 | --- | --- | --- |
-| Preview | [`preview`](https://github.com/NARUBROWN/spine-user-demo/tree/preview) | 개발 중인 변경과 실험 버전을 확인합니다. |
-| RC | [`rc`](https://github.com/NARUBROWN/spine-user-demo/tree/rc) | 정식 공개 전 릴리스 후보를 확인합니다. |
-| Stable | [`main`](https://github.com/NARUBROWN/spine-user-demo/tree/main) | 정식 의존성을 사용하는 공개 예제이며 기본 브랜치입니다. |
+| Preview | [`preview`](https://github.com/NARUBROWN/spine-user-demo/tree/preview) | Development changes and experimental versions |
+| RC | [`rc`](https://github.com/NARUBROWN/spine-user-demo/tree/rc) | Release candidates before stable publication |
+| Stable | [`main`](https://github.com/NARUBROWN/spine-user-demo/tree/main) | Public example using stable dependencies; the default branch |
 
-예제 코드는 `preview → rc → main` 순서로 승격합니다. 예제 태그는 `vX.Y.Z-preview.N`, `vX.Y.Z-rc.N`, `vX.Y.Z`로 구분하며, **GitHub Release는 Stable에서만 발행합니다.** 실제 Spine 버전은 선택한 브랜치의 `go.mod`를 확인하세요. [채널 검사와 발행 절차](RELEASE_CHANNELS.md)를 참고하세요.
+Example code is promoted through `preview → rc → main`. Tags use `vX.Y.Z-preview.N`, `vX.Y.Z-rc.N`, and `vX.Y.Z`. **GitHub Releases are published only for Stable.** Check the selected branch's `go.mod` for the actual Spine version. See [channel checks and publication](RELEASE_CHANNELS.md).
 
-## Spine CLI로 실행하기
+## Run with Spine CLI
 
-Go와 Spine CLI를 설치하고 [MySQL 연결 설정과 최초 마이그레이션](#실행-방법)을 마쳤다면,
-이 저장소 루트에서 다음 명령으로 개발 서버를 실행할 수 있습니다.
+After installing Go and Spine CLI and completing [MySQL configuration and the initial migration](#running), run the development server from the repository root:
 
 ```sh
 spine dev
 ```
 
-서버는 기본적으로 `http://localhost:8080`에서 실행됩니다. 코드를 수정하면 CLI가 변경을 감지해
-자동으로 다시 빌드하고, 빌드가 성공하면 서버를 새 코드로 교체합니다.
-개발 서버를 실행 중인 터미널과 별도로, 다음 명령으로 실행 파일을 빌드하거나 계약과 코드를 검증할 수 있습니다.
+The server defaults to `http://localhost:8080`. The CLI detects code changes, rebuilds, and replaces the server after a successful build. In another terminal, build an executable or verify contracts and code with:
 
 ```sh
 spine build
 spine verify
 ```
 
-## 둘러보기
-Spine는 실행 흐름을 숨기지 않고, Controller 시그니처를 API 계약으로 삼는 실행 파이프라인 중심 프레임워크입니다.  
-컨테이너 구성, 입력 해석, 반환 처리의 책임이 분리되어 있어 구조가 명확하고 테스트가 쉬운 것이 장점입니다.
+## Overview
 
-이 프로젝트는 BUN ORM 기반 CRUD로 MySQL 연결 및 마이그레이션을 구성하고, Repository에서 `bun.IDB`로 `Select/Insert/Update/Delete`를 수행합니다.  
-요청 단위 트랜잭션은 Tx 인터셉터에서 시작해 `ExecutionContext`에 보관한 뒤, HTTP 응답을 쓰기 전 `BeforeResponse`에서 커밋/롤백합니다.
+Spine makes execution flow explicit and uses controller signatures as API contracts. Container composition, input resolution, and return handling have separate responsibilities.
 
-이 예제는 Spine `v0.7.5`의 인터셉터 생명주기와 HTTP 범위 등록 계약을 따릅니다. HTTP 응답 직렬화와 상태, 쿠키 검증이 끝난 뒤 `BeforeResponse`가 호출되므로, 응답 준비 실패도 요청 단위 트랜잭션 롤백에 반영됩니다.
+This project configures MySQL connections and migrations for Bun CRUD. Repositories use `bun.IDB` for `Select/Insert/Update/Delete`. A Tx interceptor starts a request-scoped transaction, stores it in `ExecutionContext`, and commits or rolls back in `BeforeResponse` before writing the HTTP response.
 
-추가로 다음 동작을 실제 HTTP 계약으로 제공합니다.
+The example follows Spine `v0.7.5` interceptor lifecycle and HTTP-scoped registration contracts. `BeforeResponse` runs after response serialization and status/cookie validation, so response preparation failures also roll back the transaction.
 
-- 이름과 이메일, 사용자 ID를 검증하고 잘못된 입력은 `400 Bad Request`로 반환합니다.
-- 존재하지 않는 사용자는 `404 Not Found`, MySQL 고유 키와 충돌하는 이메일은 `409 Conflict`로 반환합니다.
-- `App.Validate`로 리스너를 열기 전에 애플리케이션 구성을 검사합니다.
-- HTTP 범위 인터셉터가 요청 ID와 처리 시간을 영문 로그로 남깁니다. 유효한 `X-Request-ID`가 있으면 이어서 사용합니다.
-- 성공 응답은 커밋하고 컨트롤러 오류와 응답 준비 오류는 롤백하는 경계를 Docker E2E로 검증합니다.
+The HTTP contract includes:
 
-`constructor`는 `github.com/NARUBROWN/spine/pkg/constructor` 패키지입니다. 사용자 정의를 포함한 다섯 역할을 하나의 `app.Constructor(...)` 호출에 모으며 같은 DI 컨테이너를 공유합니다. `constructor.Controller`는 생성 메서드와 `RegisterRoutes`를, `constructor.Interceptor`는 생성 메서드와 기존 인터셉터 계약을 검사합니다. 인터셉터 적용은 기존 `InterceptorFor`로 지정합니다. 공개된 정식 모듈로 검증합니다.
+- Name, email, and user ID validation, returning `400 Bad Request` for invalid input.
+- `404 Not Found` for missing users and `409 Conflict` for email uniqueness conflicts in MySQL.
+- Configuration checks with `App.Validate` before opening a listener.
+- HTTP-scoped request ID and duration logging in English, retaining a valid incoming `X-Request-ID`.
+- Docker E2E checks for committing successful responses and rolling back controller errors and response preparation failures.
+
+`constructor` is `github.com/NARUBROWN/spine/pkg/constructor`. Register all five roles, including custom components, in one `app.Constructor(...)` call using the same DI container. `constructor.Controller` checks construction and `RegisterRoutes`; `constructor.Interceptor` checks construction and the interceptor contract. Apply interceptors through `InterceptorFor`. Verification uses published stable modules.
 
 ```go
 app.Constructor(
@@ -63,7 +59,8 @@ app.Constructor(
 )
 ```
 
-생성자 의존성 예시 (Repository -> Service):
+Constructor dependency example (Repository → Service):
+
 ```go
 type UserRepository struct {
     db bun.IDB
@@ -82,13 +79,15 @@ func (*UserService) Constructor(repo *repository.UserRepository) *UserService {
 }
 ```
 
-핵심 특징:
-- 객체 표식으로 등록하는 컴포넌트는 **`Constructor` 메서드**를 가져야 하며, 의존성은 생성자 파라미터로 명시합니다. 외부 타입의 기존 생성자 함수는 `constructor.Custom(NewX)`로 등록할 수 있습니다.
-- Controller는 `spine.Ctx`와 명시적 Query 및 Body 래퍼를 받습니다. 서비스와 저장소에 전달할 표준 컨텍스트는 `ctx.ExecutionContext().Context()`로 꺼냅니다.
-- `input.Query[dto.UserQuery]`는 `ID`를 기본 이름 `id`로 바인딩하며 playground가 필수값과 양수 여부를 검사합니다.
-- Repository는 `bun.IDB`를 사용해 `bun.DB`와 `bun.Tx`를 동일한 인터페이스로 처리합니다.
+Key behavior:
 
-예시:
+- Components registered as object markers must implement a **`Constructor` method**, declaring dependencies as parameters. Existing constructor functions for external types can use `constructor.Custom(NewX)`.
+- Controllers receive `spine.Ctx` and explicit Query/Body wrappers. Retrieve the standard context for services and repositories with `ctx.ExecutionContext().Context()`.
+- `input.Query[dto.UserQuery]` binds `ID` under the default name `id`; playground checks required and positive values.
+- Repositories use `bun.IDB` to handle `bun.DB` and `bun.Tx` through one interface.
+
+Example:
+
 ```go
 type UserQuery struct { ID *int64 `validate:"required,gt=0"` }
 
@@ -96,7 +95,7 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
     r.GET("/users", func(ctx spine.Ctx, q input.Query[dto.UserQuery]) (httpx.Response[dto.CreateUserResponse], error) {
         userId := (*q).UserID()
         if userId <= 0 {
-            return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id는 1 이상의 정수여야 합니다.")
+            return httpx.Response[dto.CreateUserResponse]{}, httperr.BadRequest("id\ub294 1 \uc774\uc0c1\uc758 \uc815\uc218\uc5ec\uc57c \ud569\ub2c8\ub2e4.")
         }
         user, err := c.userService.Get(ctx.ExecutionContext().Context(), userId)
         if err != nil {
@@ -107,9 +106,10 @@ func (c *UserController) RegisterRoutes(r *api.Registry) {
 }
 ```
 
-숫자 변환에 실패하거나 범위를 넘는 ID는 바인딩 단계에서 HTTP 400으로 거부됩니다. 같은 `id`를 여러 번 전달하는 요청도 HTTP 400으로 거부합니다. 이전 `query.Values`는 첫 번째 값만 사용했습니다.
+IDs that fail numeric conversion or overflow are rejected with HTTP 400 during binding. Repeated `id` parameters are also rejected with HTTP 400. The former `query.Values` path used only the first value.
 
-DTO 예시:
+DTO example:
+
 ```go
 type CreateUserRequest struct {
     ID    int    `json:"id"`
@@ -129,9 +129,10 @@ type CreateUserResponse struct {
 }
 ```
 
-인터셉터 예시:
-- CORS는 Spine에서 제공하는 인터셉터를 사용하고, 나머지는 사용자가 직접 구현합니다.
-- 아래는 요청/응답 로깅을 위한 사용자 구현 예시입니다.
+Interceptor example:
+
+- CORS uses Spine's supplied interceptor; other interceptors are application implementations.
+- The following custom interceptor logs requests and responses.
 
 ```go
 package interceptor
@@ -268,7 +269,8 @@ func httpRequest(ctx spinectx.Ctx) spinectx.HTTPRequestView {
 func (*LoggingInterceptor) Constructor() *LoggingInterceptor { return &LoggingInterceptor{} }
 ```
 
-Tx 인터셉터 예시:
+Transaction interceptor example:
+
 ```go
 package interceptor
 
@@ -299,7 +301,7 @@ func (i *TxInterceptor) PreHandle(ctx spinectx.Ctx, meta core.HandlerMeta) error
 		return err
 	}
 
-	// ExecutionContext에 tx 저장
+	// Store tx in ExecutionContext
 	ctx.ExecutionContext().Set("tx", tx)
 	return nil
 }
@@ -336,9 +338,10 @@ func (i *TxInterceptor) AfterCompletion(
 }
 ```
 
-모든 인터셉터는 `app.Constructor`에 등록하고 typed nil로 컨테이너에서 조회합니다. CORS 팩토리는 `constructor.Custom`으로 등록합니다.
+Register all interceptors with `app.Constructor` and retrieve them from the container using typed nils. Register the CORS factory with `constructor.Custom`.
 
-등록 예시:
+Registration example:
+
 ```go
 app.Constructor(
 		constructor.Custom(database.NewBunDB),
@@ -357,73 +360,64 @@ app.Constructor(
 	)
 ```
 
-## 권장 환경
-- 최소 Go 버전: 1.26.0 (playground 검증기 의존성)
-- 검증한 Go 버전: 1.26.0
+## Requirements
 
-## Spine CLI 프로젝트 구조
+- Minimum Go version: 1.26.0, required by the playground validator dependency.
+- Verified Go version: 1.26.0.
 
-Spine CLI v0.4.4의 플랫폼 조립 방식과 컨트롤러 내부 경로 등록 방식을 사용합니다.
-이 예제에는 Go `1.26.0` 이상이 필요합니다. 다음 명령으로 CLI v0.4.4를 설치할 수 있습니다.
+## Spine CLI project layout
+
+Uses Spine CLI v0.4.4 platform composition and controller-owned route registration. Requires Go `1.26.0` or later. Install CLI v0.4.4 with:
 
 ```sh
 go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.4
 spine version
 ```
 
-CLI는 정식 버전 `v0.4.4`를 설치합니다. CI 검증 버전도 `.github/example-channels.json`에 고정합니다.
+Install stable CLI `v0.4.4`. CI pins the verified version in `.github/example-channels.json`.
 
-HTTP 앱은 Spine `v0.7.5`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`, Echo `v5.4.4`를 사용합니다.
-설치와 전체 명령은 [공식 CLI 저장소](https://github.com/NARUBROWN/spine-cli#readme)를 참고하세요.
+The HTTP application uses Spine `v0.7.5`, Echo platform `v0.2.1`, playground validator `v0.2.0`, and Echo `v5.4.4`. See the [official CLI repository](https://github.com/NARUBROWN/spine-cli#readme) for installation and all commands.
 
-`spine new`의 기본 `layered-v1` 구조를 사용합니다. `spine g resource user`와 DTO 생성기로
-만든 뼈대에 기존 Bun CRUD, 검증, 오류 매핑과 트랜잭션 처리를 옮겼습니다.
-HTTP 메서드와 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
+The project uses `spine new`'s default `layered-v1` layout. Existing Bun CRUD, validation, error mapping, and transactions were moved into the skeleton created by `spine g resource user` and the DTO generator. HTTP methods and paths are registered in the controller's `RegisterRoutes`.
 
 ```text
 .
-├── spine.toml                     # layered-v1, Echo 플랫폼, 구성 패키지
-├── main.go                        # 마이그레이션 플래그, 환경 검증과 실행
-├── database/domain/user.go        # 기존 Bun 모델과 테이블 매핑
+├── spine.toml                     # layered-v1, Echo platform, composition package
+├── main.go                        # Migration flag, environment validation, startup
+├── database/domain/user.go        # Existing Bun model and table mapping
 ├── internal/
-│   ├── application/               # 플랫폼, 생성자, 인터셉터, 라우트 연결
-│   ├── database/                  # DSN 검증과 지연 Bun 생성자
-│   └── interceptor/               # HTTP 로깅과 요청 단위 트랜잭션
+│   ├── application/               # Platform, constructors, interceptors, route wiring
+│   ├── database/                  # DSN validation and lazy Bun constructor
+│   └── interceptor/               # HTTP logging and request-scoped transactions
 ├── src/
-│   ├── controller/                # 사용자 HTTP 핸들러
-│   ├── service/                   # CRUD와 오류 매핑
-│   ├── repository/                # Bun 쿼리
-│   └── dto/                       # 요청, 응답과 입력 검증
-├── migrations/                    # 기존 SQL과 마이그레이션 실행
+│   ├── controller/                # User HTTP handlers
+│   ├── service/                   # CRUD and error mapping
+│   ├── repository/                # Bun queries
+│   └── dto/                       # Requests, responses, and input validation
+├── migrations/                    # Existing SQL and migration execution
 ├── e2e/
 └── scripts/e2e.sh
 ```
 
-생성자는 `BuildApplication`에서 역할별로 연결하고, HTTP 경로는 컨트롤러의 `RegisterRoutes`에서 등록합니다.
-`spine.New(echoplatform.Option(), spine.WithValidator(validator))`로 Echo v5 플랫폼과 playground를 선택하며, 내장 OpenAPI 명세와 UI는 `boot.HTTPOptions.OpenAPI`로 설정합니다.
-`BuildApplication`은 DB에 접속하거나 리스너를 열지 않습니다.
+`BuildApplication` registers constructors by role; controller `RegisterRoutes` methods register HTTP routes. `spine.New(echoplatform.Option(), spine.WithValidator(validator))` selects Echo v5 and playground. `boot.HTTPOptions.OpenAPI` configures built-in OpenAPI and its UI. `BuildApplication` neither connects to the database nor opens a listener.
 
-`spine.toml`에는 `recipe = "platform-contracts-preview"`, `websocket_platform = "none"`,
-`validator = "playground"`를 기록합니다. `BuildApplication`에서 만든 검증기를 실제 요청 검증과 명세 생성에 함께 사용합니다.
-`spine update`는 이 레시피의 의존성만 갱신하므로 기존 앱의 구성 코드는 직접 옮겨야 합니다.
+`spine.toml` records `recipe = "platform-contracts-preview"`, `websocket_platform = "none"`, and `validator = "playground"`. The validator created by `BuildApplication` is shared by request validation and specification generation. `spine update` updates only this recipe's dependencies; migrate existing application composition code manually.
 
 ```sh
 spine update --dry-run --json
-# changes, diff, base_hash를 검토한 뒤 적용합니다.
+# Review changes, diff, and base_hash before applying.
 spine update --if-match <base_hash> --json
 ```
 
-새 리소스의 생성 계획도 같은 방식으로 확인할 수 있습니다.
+Preview generation for a new resource in the same way:
 
 ```sh
 spine g resource product --dry-run --json
 ```
 
-출력의 `changes`, `diff`, `base_hash`를 확인한 뒤 같은 명령에 `--if-match <base_hash>`를
-전달합니다. 리소스 생성기는 domain, repository, service, controller를 생성하고 생성자를
-연결합니다. DTO와 HTTP 경로는 별도로 추가하며, Bun 쿼리와 트랜잭션은 직접 구현합니다.
+Review `changes`, `diff`, and `base_hash`, then pass `--if-match <base_hash>` to the same command. The resource generator creates domain, repository, service, and controller components and connects their constructors. Add DTOs and HTTP routes separately; implement Bun queries and transactions yourself.
 
-DB 연결이나 마이그레이션 없이 다음 검사를 실행합니다.
+Run these checks without connecting to the database or running migrations:
 
 ```sh
 spine context --root . --json
@@ -433,108 +427,120 @@ spine build --root .
 spine contract probe --root . --json
 ```
 
-`./scripts/check.sh`는 위 검사와 CLI 빌드, race 검사를 함께 실행합니다.
-다른 위치의 CLI를 사용하려면 `SPINE_CLI_BIN=/경로/spine ./scripts/check.sh`로 지정합니다.
+`./scripts/check.sh` runs these checks, the CLI build, and race checks. To use a CLI from another location, set `SPINE_CLI_BIN=/path/to/spine ./scripts/check.sh`.
 
-`BuildApplication`은 `internal/config.ValidateEnvironment`를 호출해 보안 시나리오에 필요한 토큰을 앱 조립 전에 검증합니다. 토큰이 없으면 `boot.ConfigError`를 반환합니다. 컨트롤러에서는 키를 검증하지 않습니다.
+`BuildApplication` calls `internal/config.ValidateEnvironment` to validate security-scenario tokens before application composition. Missing tokens return `boot.ConfigError`; controllers do not validate configuration keys.
 
-CLI가 해석할 수 있도록 테스트 라우트는 `RegisterRoutes`에서 환경 변수의 `"1"` 여부를 직접 비교해 등록합니다. `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS`는 오류와 롤백 검증용 라우트를, `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS`는 인증 검증용 라우트를 활성화합니다. CLI 검사와 서버 실행에 같은 환경 변수를 전달해야 합니다. 부분 probe는 DB 연결이나 실제 HTTP, 인터셉터 동작을 확인하지 않으므로 아래 Docker E2E도 별도로 실행합니다.
+For CLI analysis, test routes in `RegisterRoutes` directly compare environment variables to `"1"`. `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS` enables error/rollback routes; `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS` enables authentication checks. Pass the same variables to CLI checks and server execution. Partial probes do not check database connections, real HTTP, or interceptor behavior; also run Docker E2E below.
 
-## 실행 방법
-1. MySQL DSN 설정
+## Running
+
+1. Configure the MySQL DSN:
+
    ```sh
    export SPINE_DEMO_MYSQL_DSN='root:change-me@tcp(localhost:3306)/spine_demo?parseTime=true&loc=Local'
    ```
-2. 의존성 다운로드
+
+2. Download dependencies:
+
    ```sh
    go mod download
    ```
-3. 최초 실행 전 마이그레이션
+
+3. Run migrations before the first start:
+
    ```sh
    go run . -migrate
    ```
-4. CLI로 서버 실행
+
+4. Start the server with the CLI:
+
    ```sh
    spine dev
-   # 또는 spine run / go run .
+   # Or spine run / go run .
    ```
-5. 서버 주소: `http://localhost:8080`
-6. 내장 API UI: `http://localhost:8080/docs`, OpenAPI JSON: `http://localhost:8080/openapi.json`
 
-## 간단한 호출 예시
-- 조회
-  ```sh
-  curl "http://localhost:8080/users?id=1"
-  ```
-- 생성
-  ```sh
-  curl -X POST "http://localhost:8080/users" \
-    -H "Content-Type: application/json" \
-    -d '{"name":"alice","email":"alice@example.com"}'
-  ```
-- 수정
-  ```sh
-  curl -X PUT "http://localhost:8080/users?id=2" \
-    -H "Content-Type: application/json" \
-    -d '{"name":"bob"}'
-  ```
-- 삭제
-  ```sh
-  curl -X DELETE "http://localhost:8080/users?id=2"
-  ```
+5. Server: `http://localhost:8080`.
+6. Built-in API UI: `http://localhost:8080/docs`; OpenAPI JSON: `http://localhost:8080/openapi.json`.
 
-## HTTP 오류 계약
+## Request examples
 
-| 상황 | 상태 |
+Read:
+
+```sh
+curl "http://localhost:8080/users?id=1"
+```
+
+Create:
+
+```sh
+curl -X POST "http://localhost:8080/users"   -H "Content-Type: application/json"   -d '{"name":"alice","email":"alice@example.com"}'
+```
+
+Update:
+
+```sh
+curl -X PUT "http://localhost:8080/users?id=2"   -H "Content-Type: application/json"   -d '{"name":"bob"}'
+```
+
+Delete:
+
+```sh
+curl -X DELETE "http://localhost:8080/users?id=2"
+```
+
+## HTTP error contract
+
+| Condition | Status |
 | --- | --- |
-| 본문 누락, 빈 이름, 잘못된 이메일, `id <= 0` | `400 Bad Request` |
-| 존재하지 않는 사용자 조회, 수정, 삭제 | `404 Not Found` |
-| 이미 등록된 이메일로 생성 | `409 Conflict` |
-| 예상하지 못한 저장소, 응답 준비 오류 | 본문에 내부 원인을 노출하지 않는 `500 Internal Server Error` |
+| Missing body, empty name, invalid email, or `id <= 0` | `400 Bad Request` |
+| Read/update/delete of a missing user | `404 Not Found` |
+| Create with an existing email | `409 Conflict` |
+| Unexpected storage or response preparation failure | `500 Internal Server Error`, without exposing internal causes in the body |
 
 ## Docker E2E
 
-Docker와 `curl`이 설치된 환경에서는 한 명령으로 MySQL 8.4 컨테이너, 마이그레이션, 실제 HTTP 서버를 실행해 전체 계약을 검증할 수 있습니다.
+With Docker and `curl`, one command starts MySQL 8.4, runs migrations, and starts a real HTTP server to verify the full contract.
 
 ```sh
 ./scripts/e2e.sh
 ```
 
-E2E는 다음 경계를 실제 MySQL 행 수로 확인합니다.
+E2E checks transaction boundaries using actual MySQL row counts:
 
-- 정상 사용자 생성 후 트랜잭션 커밋
-- 중복 이메일 `409` 후 기존 행 유지
-- 컨트롤러가 오류를 반환한 뒤 삽입 행 롤백
-- 잘못된 응답 쿠키 때문에 응답 준비가 실패한 뒤 삽입 행 롤백
-- 선택적 보호 라우트의 인증 실패 시 사용자 행이 추가되지 않음
-- 인증되지 않은 잘못된 본문은 바인딩 전에 거부되고, 유효한 인증의 잘못된 본문은 400으로 처리됨
+- Commit after successful user creation.
+- Preserve existing rows after duplicate email `409`.
+- Roll back inserted rows when the controller returns an error.
+- Roll back inserted rows when an invalid response cookie causes response preparation to fail.
+- Do not insert users when authentication fails on an optional protected route.
+- Reject unauthenticated invalid bodies before binding; return 400 for invalid bodies with valid authentication.
 
-컨트롤러, 응답 오류 경로는 일반 실행에서는 노출되지 않습니다. 스크립트가 `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`을 설정할 때만 `/scenarios/transactions/*` 라우트가 등록됩니다.
+Controller/response failure routes are absent during ordinary execution. `/scenarios/transactions/*` is registered only when the script sets `SPINE_DEMO_ENABLE_FAILURE_SCENARIOS=1`.
 
-보안 검증용 `POST /scenarios/security/users`는 `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1`과 비어 있지 않은 `SPINE_DEMO_SECURITY_TOKEN`을 함께 지정해야 등록됩니다. `Authorization: Bearer <토큰>`을 검사하고, 본문 처리는 인증 성공 후에 진행합니다. 이 토큰은 테스트용 공유 자격 증명이며 사용자별 인증, 인가 예제는 아닙니다. 기존 `/users` 경로에는 이 인증이 적용되지 않습니다. E2E 스크립트는 격리된 로컬 실행에만 사용할 임시 테스트 토큰을 설정합니다.
+The security test route `POST /scenarios/security/users` requires both `SPINE_DEMO_ENABLE_SECURITY_SCENARIOS=1` and a nonempty `SPINE_DEMO_SECURITY_TOKEN`. It checks `Authorization: Bearer <token>` before processing the body. This is a shared test credential, not a per-user authentication/authorization example. Existing `/users` routes do not use this authentication. E2E scripts set a temporary token only for isolated local tests.
 
-`internal/interceptor`의 HTTP 파이프라인 테스트는 인증 실패와 잘못된 본문에서 컨트롤러 미실행, 작은 본문 제한의 적용, 동시 요청의 컨텍스트 격리를 검사합니다. 해당 테스트는 MySQL 없이 Spine과 Echo 플랫폼의 `Prepare` 경로를 사용합니다. 직접 외부 인프라에 연결해 E2E를 실행할 때는 서버에도 보안 시나리오 활성화 변수와 토큰을 지정한 뒤 다음 환경 변수를 사용합니다.
+HTTP pipeline tests in `internal/interceptor` verify that controllers do not run on authentication failures or invalid bodies, small body limits are applied, and concurrent request contexts are isolated. They use Spine and Echo platform Prepare without MySQL. When running E2E against external infrastructure directly, enable security scenarios and the token on the server, then use:
 
 ```sh
 SPINE_DEMO_MYSQL_DSN='root:spine@tcp(127.0.0.1:13307)/spine_demo?parseTime=true&loc=Local' \
 SPINE_DEMO_E2E_BASE_URL='http://127.0.0.1:18080' \
-SPINE_DEMO_E2E_SECURITY_TOKEN='<서버에 설정한 테스트 토큰>' \
+SPINE_DEMO_E2E_SECURITY_TOKEN='<test-token-configured-on-server>' \
 go test -tags=e2e -v ./e2e
 ```
 
-스크립트는 종료할 때 테스트 서버와 MySQL 컨테이너 및 볼륨을 정리합니다. 별도 포트가 필요하면 `SPINE_DEMO_E2E_MYSQL_PORT`와 `SPINE_DEMO_E2E_HTTP_PORT`를 설정할 수 있습니다.
+The script cleans up the test server, MySQL container, and volumes on exit. Set `SPINE_DEMO_E2E_MYSQL_PORT` and `SPINE_DEMO_E2E_HTTP_PORT` for alternative ports.
 
-## 컨트롤러 경로 등록
+## Controller route registration
 
-이 예제는 공개된 Spine `v0.7.5`의 `api.Controller.RegisterRoutes`를 사용합니다. 기본 User 앱과 기존 DB를 자동으로 이전하거나 재기동하지 않습니다.
+Uses `api.Controller.RegisterRoutes` from published Spine `v0.7.5`. It does not automatically migrate or restart the existing User application or database.
 
-`src/controller/user_controller.go`가 CRUD 경로와 콜백을 함께 선언하고 `internal/application`은 구체 생성자를 등록합니다. 별도 src/route/route.go는 사용하지 않습니다. Query와 Body는 `input.Query[dto.UserQuery]`, `input.Body[dto.CreateUserRequest]` 등으로 받으며 기존 DTO 정규화와 검증, 트랜잭션, 오류 응답 및 선택적 실패와 보안 시나리오를 유지합니다.
+`src/controller/user_controller.go` declares CRUD routes and callbacks together; `internal/application` registers concrete constructors. There is no separate src/route/route.go. Query and body inputs use wrappers such as `input.Query[dto.UserQuery]` and `input.Body[dto.CreateUserRequest]`, retaining DTO normalization/validation, transactions, error responses, and optional failure/security scenarios.
 
-준비 전 `spine.DescribeHTTP`는 생성자를 실행하지 않고 ErrRoutesNotCollected를 반환합니다. CLI 정적 내보내기를 사용하거나, 앱을 명시적으로 Prepare한 뒤 DescribePreparedHTTP를 조회하세요. DB와 브로커 초기화는 명시한 준비 과정의 일부입니다.
+Before preparation, `spine.DescribeHTTP` returns ErrRoutesNotCollected without executing constructors. Use CLI static export, or explicitly Prepare the application before calling DescribePreparedHTTP. Database and broker initialization are part of explicit preparation.
 
-## 내장 OpenAPI와 API UI
+## Built-in OpenAPI and API UI
 
-외부 명세 생성기의 의존성, 주석과 생성 스냅샷을 제거했습니다. 앱을 준비할 때 실제 등록에서 OpenAPI 3.1 명세를 생성하고 메모리에 보관합니다. UI와 정적 파일도 Spine 패키지에서 제공하며 별도 Echo 핸들러나 외부 CDN이 필요하지 않습니다.
+External specification generator dependencies, annotations, and generated snapshots have been removed. During preparation, the application generates an OpenAPI 3.1 specification from actual registrations and retains it in memory. Spine supplies the UI and static assets; no extra Echo handler or external CDN is required.
 
 ```go
 validator, err := playground.New()
@@ -557,26 +563,26 @@ options := boot.Options{
 }
 ```
 
-`playground`는 `github.com/NARUBROWN/spine-validator-playground`, `swaggerui`는 `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`에서 가져옵니다. JSON은 `/openapi.json`, UI는 `/docs`입니다. 이전 `/swagger/*` 경로는 제공하지 않습니다.
+Import `playground` from `github.com/NARUBROWN/spine-validator-playground` and `swaggerui` from `github.com/NARUBROWN/spine/pkg/openapi/ui/swaggerui`. JSON is served at `/openapi.json`; the UI is at `/docs`. The old `/swagger/*` route is not provided.
 
-런타임 명세에는 쿼리 `id`, 생성과 수정 요청 본문, `CreateUserResponse`, HTTP 400 오류 구조가 포함됩니다. DTO의 `validate` 태그에서 다음 제약을 읽으며, 같은 검증기가 핸들러 실행 전 요청을 검사합니다.
+The runtime specification includes query `id`, create/update bodies, `CreateUserResponse`, and the HTTP 400 error schema. It reads these constraints from DTO `validate` tags; the same validator checks requests before handler execution.
 
-| 입력 | 검증과 명세 |
+| Input | Validation and specification |
 | --- | --- |
-| 쿼리 `id` | 필수 정수, `0` 초과 |
-| 생성과 수정의 `name` | 필수 문자열, 최대 100자 |
-| 생성의 `email` | 필수 문자열, 이메일 형식, 최대 255자 |
+| Query `id` | Required integer greater than `0` |
+| Create/update `name` | Required string, maximum 100 characters |
+| Create `email` | Required email string, maximum 255 characters |
 
-태그 검증은 원본 입력에 적용됩니다. 기존 수동 `Validate()`는 그 뒤 문자열 정리, 공백뿐인 이름 거부, 이메일 바이트 길이와 `net/mail` 검사를 유지합니다. 따라서 앞뒤 공백이 있는 이메일이나 정리 전 100자를 넘는 이름은 태그 검증에서 HTTP 400으로 거부됩니다. 생성 요청의 `id`는 DB가 발급하므로 사용하지 않으며, 수정 요청의 `email`도 변경하지 않습니다.
+Tag validation applies to original input. Existing manual `Validate()` then retains trimming, whitespace-only name rejection, email byte limits, and `net/mail` checks. Consequently, surrounding whitespace in email or a name longer than 100 characters before trimming is rejected with HTTP 400 by tag validation. Create request `id` is unused because the database allocates it; update request `email` is not changed.
 
-필드 검증 오류는 HTTP 400 응답의 `fields`에 입력 위치, JSON Pointer와 실패 규칙을 담습니다. 정적 명세가 필요하면 다음 명령으로 별도 내보낼 수 있습니다.
+Field validation errors include input location, JSON Pointer, and the failed rule in HTTP 400 `fields`. Export a static specification separately with:
 
 ```sh
 spine contract export --format openapi --source static --output openapi.json
 ```
 
-수동 `Validate()`의 추가 규칙, 동적 상태 코드와 인증 정책은 자동 추론하지 않습니다. 응답 DTO는 `default` 응답에 표시되며, `404`와 `409` 같은 업무 오류를 개별 응답으로 추정하지 않습니다.
+Additional manual `Validate()` rules, dynamic status codes, and authentication policies are not inferred automatically. Response DTOs appear under the `default` response; business errors such as `404` and `409` are not inferred as separate responses.
 
-## 정식 의존성
+## Stable dependencies
 
-Spine `v0.7.5`, CLI `v0.4.4`, Echo 플랫폼 `v0.2.1`, playground 검증기 `v0.2.0`을 사용합니다. 실제 의존성은 `go.mod`에 고정합니다. `spine.toml`에는 CLI가 지원하는 `platform-contracts-preview` 레시피 이름을 유지하고, 의존성 채널은 `main`로 지정합니다.
+Uses Spine `v0.7.5`, CLI `v0.4.4`, Echo platform `v0.2.1`, and playground validator `v0.2.0`. Actual dependencies are pinned in `go.mod`. `spine.toml` retains the CLI-supported `platform-contracts-preview` recipe name and selects the `main` dependency channel.
